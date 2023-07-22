@@ -1,0 +1,22 @@
+# gratheon / gate-video-stream
+Main video processng microservice.
+
+### URLs
+localhost:8900
+
+## Architecture
+
+```mermaid
+flowchart LR
+	web-app --"upload"--> gate-video-stream --"inference"-->models-gate-tracker--"post results"-->redis-->event-stream-filter
+	gate-video-stream --"store for re-training with 1 month TTL"--> S3
+	gate-video-stream --"store results long-term" --> mysql
+
+    web-app("<a href='https://github.com/Gratheon/web-app'>web-app</a>\n:8080") --> graphql-router("<a href='https://github.com/Gratheon/graphql-router'>graphql-router</a>") --"list video stream URLs"--> gate-video-stream("<a href='https://github.com/Gratheon/gate-video-stream'>gate-video-stream</a>\n:8900") -- "get data for playback" --> mysql
+
+```
+
+### Development
+```
+make start
+```

@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  gate-video-stream:
+    build: .
+    command:
+      node /app/app/gate-video-stream.js
+    environment:
+      - ENV_ID=prod
+      - PORT=8900
+    ports:
+      - 8900:8900
+    volumes:
+      - .:/app/
+    restart: always
+    network_mode: host

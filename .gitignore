@@ -1,0 +1,13 @@
+.idea
+input
+input2
+out
+out2
+out_annotation
+node_modules
+tmp
+coverage
+app
+src/config/config.dev.ts
+src/config/config.prod.ts
+models-yolov5
