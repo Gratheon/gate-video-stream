@@ -1,6 +1,10 @@
 # gratheon / gate-video-stream
 Main video processng microservice.
 
+- Exposes endpoint to upload short videos from hive entrances
+- Uploads it to S3 for long-term storage
+- Posts video to inferencing
+
 ### URLs
 localhost:8900
 
