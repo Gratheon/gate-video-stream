@@ -17,6 +17,7 @@
     "fastify": "3.22.1",
     "fastify-multipart": "5.3.1",
     "fastify-raw-body": "3.2.0",
+    "fluent-ffmpeg": "2.1.2",
     "graphql": "15.6.1",
     "graphql-tag": "2.12.6",
     "graphql-upload": "13.0.0",

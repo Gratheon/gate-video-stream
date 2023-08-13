@@ -1,53 +1,61 @@
 import fs from 'fs';
-import crypto from 'crypto';
 
 import { GraphQLUpload } from 'graphql-upload';
-import { finished } from 'stream/promises';
 
 import { logger } from '../logger';
 import upload from '../models/s3';
-import fileModel from '../models/file';
-import { emitWarning } from 'process';
+import segmentModel from '../models/segment';
+import streamModel from '../models/stream';
 
 export const resolvers = {
 	Query: {
-		hello: 'world'
-	},
-	Box: {
-		streamActive: async (box, _, ctx) => {
-			return false
+		hello: 'world',
+		videoStreams: async (_, { active, boxIds }, { uid }) => {
+			return await streamModel.list(uid, boxIds, active)
 		}
 	},
-
 	Mutation: {
 		uploadGateVideo: async (_, { file, boxId }, { uid }) => {
 			try {
 
-				let [stream_id, max_chunk] = await fileModel.getMaxChunk(uid, boxId)
+				let [stream_id, max_chunk] = await streamModel.getMaxChunk(uid, boxId)
 				max_chunk = max_chunk + 1;
 
 				// local file
-				const { createReadStream, filename, mimetype, encoding } = await file;
-				const stream = createReadStream();
+				const { createReadStream } = await file;
+				// { createReadStream, filename, mimetype, encoding }
 
 				// db
 				if (!stream_id) {
-					await fileModel.insert(uid, boxId);
-					[stream_id, max_chunk] = await fileModel.getMaxChunk(uid, boxId)
+					await streamModel.endPreviousBoxStreams(uid, boxId);
+					await streamModel.insert(uid, boxId);
+					[stream_id, max_chunk] = await streamModel.getMaxChunk(uid, boxId)
 				} else {
-					await fileModel.increment(uid, boxId)
+					await streamModel.increment(uid, boxId)
 				}
 
+				let webmFilePath = `/app/tmp/${uid}_${max_chunk}.webm`
+				await segmentModel.writeWebmFile(createReadStream, webmFilePath)
+
 				let uploaded_filename = `${max_chunk}.mp4`
-				// AWS
-				const result = await upload(
-					stream,
-					// `tmp/${uid}_${filename}`, 
+				let mp4File = `/app/tmp/${uid}_${uploaded_filename}`
+				await segmentModel.convertWebmToMp4(webmFilePath, mp4File)
+
+				try {
+					fs.unlinkSync(webmFilePath);
+				} catch (err) {
+					console.error('Error deleting file:', err);
+				}
+
+				await upload(
+					fs.createReadStream(mp4File),
 					`${uid}/gate_videos/${boxId}/${stream_id}/${uploaded_filename}`);
 
-
-				logger.info('uploaded', { filename, result });
-
+				try {
+					fs.unlinkSync(mp4File);
+				} catch (err) {
+					console.error('Error deleting file:', err);
+				}
 				return true
 
 			} catch (err) {

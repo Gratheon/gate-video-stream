@@ -1,5 +1,8 @@
 FROM node:16-alpine
 
+# Install FFmpeg v5
+RUN apk add --no-cache ffmpeg=6.0-r15
+
 WORKDIR /app
 
 EXPOSE 8800
