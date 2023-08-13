@@ -130,11 +130,12 @@ async function startApolloServer(app, typeDefs, resolvers) {
   
     app2.route({
       method: 'GET',
-      url: '/hls/:boxId/:streamId/playlist.m3u8',
+      url: '/hls/:uid/:boxId/:streamId/playlist.m3u8',
       handler: async function (request, reply) {
         reply.header('Content-Type', 'application/vnd.apple.mpegurl');
         const playlist = await streamModel.generateHlsPlaylist(
-          4,
+          //@ts-ignore
+          request.params.uid,
           //@ts-ignore
           request.params.boxId,
           //@ts-ignore

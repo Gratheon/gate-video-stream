@@ -24,21 +24,21 @@ ${segments}
     let streams;
     if (active) {
       streams = await storage().query(
-        sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime
+        sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime, user_id as userId
       FROM streams 
       WHERE user_id=${userId} AND box_id IN (${boxIds}) AND end_time IS NULL`
       );
     }
     else {
       streams = await storage().query(
-        sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime
+        sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime, user_id as userId
       FROM streams 
       WHERE user_id=${userId} AND box_id IN (${boxIds}) `
       );
     }
 
     for (const row of streams) {
-      row.playlistURL = `http://localhost:8950/hls/${row.boxId}/${row.id}/playlist.m3u8`
+      row.playlistURL = `http://localhost:8950/hls/${row.userId}/${row.boxId}/${row.id}/playlist.m3u8`
     }
 
     return streams;
