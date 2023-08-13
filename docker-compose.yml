@@ -9,6 +9,7 @@ services:
       - PORT=8900
     ports:
       - 8900:8900
+      - 8950:8950
     volumes:
       - .:/app/
     restart: always

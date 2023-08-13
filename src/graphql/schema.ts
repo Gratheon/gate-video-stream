@@ -2,6 +2,7 @@ export const schema = `
 scalar Upload
 scalar ID
 scalar DateTime
+scalar URL
 
 type Query {
 	videoStreams(boxIds: [ID], active: Boolean): [VideoStream]
@@ -14,7 +15,7 @@ type Mutation {
 type VideoStream {
 	id: ID!
 	maxSegment: Int
-	manifest: String
+	playlistURL: URL
 	active: Boolean
 	startTime: DateTime
 	endTime: DateTime

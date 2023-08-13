@@ -15,6 +15,7 @@
     "apollo-server-fastify": "3.10.2",
     "aws-sdk": "2.1116.0",
     "fastify": "3.22.1",
+    "fastify-cors": "^6.1.0",
     "fastify-multipart": "5.3.1",
     "fastify-raw-body": "3.2.0",
     "fluent-ffmpeg": "2.1.2",

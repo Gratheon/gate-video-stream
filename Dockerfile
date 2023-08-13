@@ -5,7 +5,7 @@ RUN apk add --no-cache ffmpeg=6.0-r15
 
 WORKDIR /app
 
-EXPOSE 8800
+EXPOSE 8900
 
 COPY package*.json ./
 

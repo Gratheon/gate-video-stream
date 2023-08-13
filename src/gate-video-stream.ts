@@ -10,14 +10,16 @@ import jwt from "jsonwebtoken";
 import gql from "graphql-tag";
 import fs from "fs";
 import path from "path";
+import cors from "fastify-cors"
 
 import { schema } from "./graphql/schema";
 import { resolvers } from "./graphql/resolvers";
 import { initStorage } from "./models/storage";
 import { registerSchema } from "./graphql/schema-registry";
 import config from "./config/index";
-import {logger} from "./logger";
+import { logger } from "./logger";
 import './sentry';
+import streamModel from './models/stream'
 
 function fastifyAppClosePlugin(app) {
   return {
@@ -110,11 +112,40 @@ async function startApolloServer(app, typeDefs, resolvers) {
     const version = fs.readFileSync(path.resolve(".version"), "utf8");
     await registerSchema(schema, version);
     const relPath = await startApolloServer(app, schema, resolvers);
-    
+
     // @ts-ignore
     await app.listen(process.env.PORT, "0.0.0.0");
+    logger.info(`Graphql server ready at http://localhost:${process.env.PORT}${relPath}`);
 
-    logger.info(`Server ready at http://localhost:${process.env.PORT}${relPath}`);
+
+    // REST server
+    const app2 = fastify({
+      logger,
+    });
+  
+    app2.register(cors, {
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE']
+    });
+  
+    app2.route({
+      method: 'GET',
+      url: '/hls/:boxId/:streamId/playlist.m3u8',
+      handler: async function (request, reply) {
+        reply.header('Content-Type', 'application/vnd.apple.mpegurl');
+        const playlist = await streamModel.generateHlsPlaylist(
+          4,
+          //@ts-ignore
+          request.params.boxId,
+          //@ts-ignore
+          request.params.streamId
+        )
+        reply.send(playlist)
+      }
+    })
+    await app2.listen(8950, "0.0.0.0");
+
+    logger.info(`Server ready at http://localhost:8950`);
   } catch (e) {
     console.error(e);
   }
