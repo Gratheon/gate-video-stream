@@ -13,7 +13,9 @@ localhost:8900
 
 ```mermaid
 flowchart LR
-	web-app --"upload"--> gate-video-stream --"store for re-training with 1 month TTL"--> S3
+	web-app --"upload /graphql"--> gate-video-stream --"store for re-training with 1 month TTL"--> S3
+	web-app --"get /hls video playlist"--> gate-video-stream
+	raspberry-pi-client("<a href='https://github.com/Gratheon/raspberry-pi-client'>raspberry-pi-client</a>") --"upload"--> gate-video-stream
 	gate-video-stream --"store unprocessed files" --> mysql
  	gate-video-stream --"inference unprocessed file" --> models-gate-tracker -- "post results" --> redis --> event-stream-filter
 	gate-video-stream --"store results long-term" --> mysql
