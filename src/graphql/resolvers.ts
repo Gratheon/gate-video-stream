@@ -18,20 +18,15 @@ export const resolvers = {
 		uploadGateVideo: async (_, { file, boxId }, { uid }) => {
 			try {
 
-				let [stream_id, max_chunk] = await streamModel.getMaxChunk(uid, boxId)
+				let [stream_id, max_chunk] = await streamModel.getActiveStreamMaxChunk(uid, boxId)
 				max_chunk = max_chunk + 1;
 
 				// local file
 				const { createReadStream } = await file;
-				// { createReadStream, filename, mimetype, encoding }
 
-				// db
-				if (!stream_id) {
-					await streamModel.endPreviousBoxStreams(uid, boxId);
-					await streamModel.insert(uid, boxId);
-					[stream_id, max_chunk] = await streamModel.getMaxChunk(uid, boxId)
-				} else {
-					await streamModel.increment(uid, boxId)
+
+				if (stream_id) {
+					await streamModel.increment(uid, stream_id)
 				}
 
 				let webmFilePath = `/app/tmp/${uid}_${max_chunk}.webm`
@@ -47,9 +42,17 @@ export const resolvers = {
 					console.error('Error deleting file:', err);
 				}
 
+				// db
+				if (!stream_id) {
+					await streamModel.endPreviousBoxStreams(uid, boxId);
+					await streamModel.insert(uid, boxId);
+					[stream_id, max_chunk] = await streamModel.getActiveStreamMaxChunk(uid, boxId)
+				}
+
 				await upload(
 					fs.createReadStream(mp4File),
-					`${uid}/gate_videos/${boxId}/${stream_id}/${uploaded_filename}`);
+					`${uid}/gate_videos/${boxId}/${stream_id}/${uploaded_filename}`
+				);
 
 				try {
 					fs.unlinkSync(mp4File);

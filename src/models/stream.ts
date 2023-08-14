@@ -10,11 +10,11 @@ export default {
 
     let segments = ""
     for (let i = 1; i <= count; i++) {
-      segments += `#EXTINF:5.0,\n${baseUrl}${i}.mp4\n`
+      segments += `#EXTINF:10.0,\n${baseUrl}${i}.mp4\n`
     }
 
     return `#EXTM3U
-#EXT-X-TARGETDURATION:${count * 5}
+#EXT-X-TARGETDURATION:${count * 10}
 #EXT-X-VERSION:3
 ${segments}
 #EXT-X-ENDLIST`;
@@ -43,11 +43,11 @@ ${segments}
 
     return streams;
   },
-  getMaxChunk: async function (userId, boxId): Promise<[number | null, number]> {
+  getActiveStreamMaxChunk: async function (userId, boxId): Promise<[number | null, number]> {
     const result = await storage().query(
       sql`SELECT id, max_segment
       FROM streams 
-      WHERE user_id=${userId} AND box_id=${boxId} AND NOW() - last_upload_time < 60`
+      WHERE user_id=${userId} AND box_id=${boxId} AND end_time is NULL AND NOW() - last_upload_time < 60`
     );
 
     const rel = result[0];
@@ -90,11 +90,11 @@ ${segments}
     `))[0].id;
   },
 
-  increment: async function (userId, boxId) {
+  increment: async function (userId, streamId) {
     // @ts-ignore
     return (await storage().query(sql`
     UPDATE streams SET max_segment = max_segment + 1, last_upload_time=NOW()
-    WHERE user_id=${userId} AND box_id=${boxId};
+    WHERE user_id=${userId} AND id=${streamId};
     `));
   },
 };

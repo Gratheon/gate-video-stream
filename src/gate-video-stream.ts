@@ -107,31 +107,32 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
   await initStorage(logger);
 
-  const app = fastify({
-    logger,
-  });
 
   try {
+    const server = fastify({
+      logger,
+    });
+
     const version = fs.readFileSync(path.resolve(".version"), "utf8");
     await registerSchema(schema, version);
-    const relPath = await startApolloServer(app, schema, resolvers);
+    const relPath = await startApolloServer(server, schema, resolvers);
 
     // @ts-ignore
-    await app.listen(process.env.PORT, "0.0.0.0");
+    await server.listen(process.env.PORT, "0.0.0.0");
     logger.info(`Graphql server ready at http://localhost:${process.env.PORT}${relPath}`);
 
 
     // REST server
-    const app2 = fastify({
+    const restServer = fastify({
       logger,
     });
   
-    app2.register(cors, {
+    restServer.register(cors, {
       origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE']
     });
   
-    app2.route({
+    restServer.route({
       method: 'GET',
       url: '/hls/:uid/:boxId/:streamId/playlist.m3u8',
       handler: async function (request, reply) {
@@ -147,7 +148,7 @@ async function startApolloServer(app, typeDefs, resolvers) {
         reply.send(playlist)
       }
     })
-    await app2.listen(8950, "0.0.0.0");
+    await restServer.listen(8950, "0.0.0.0");
 
     logger.info(`Server ready at http://localhost:8950`);
   } catch (e) {
