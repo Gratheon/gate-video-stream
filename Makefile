@@ -11,7 +11,7 @@ deploy-clean:
 	ssh root@gratheon.com 'rm -rf /www/gate-video-stream/app/*;'
 
 deploy-copy:
-	rsync -av -e ssh ./migrations docker-compose.yml Dockerfile package.json package-lock.json restart.sh .version ./src root@gratheon.com:/www/gate-video-stream/
+	rsync -av -e ssh ./migrations ./config docker-compose.yml Dockerfile package.json package-lock.json restart.sh .version ./src root@gratheon.com:/www/gate-video-stream/
 
 deploy-run:
 	ssh root@gratheon.com 'chmod +x /www/gate-video-stream/restart.sh'

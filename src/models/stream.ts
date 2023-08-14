@@ -38,7 +38,7 @@ ${segments}
     }
 
     for (const row of streams) {
-      row.playlistURL = `http://localhost:8950/hls/${row.userId}/${row.boxId}/${row.id}/playlist.m3u8`
+      row.playlistURL = `${config.selfRESTUrl}/hls/${row.userId}/${row.boxId}/${row.id}/playlist.m3u8`
     }
 
     return streams;

@@ -50,6 +50,7 @@ export default {
           '-movflags frag_keyframe+empty_moov+default_base_moof',
           '-f mp4',
         ])
+        .videoBitrate('3000')
         .on('end', () => {
           console.log('Conversion finished');
           resolve(true)

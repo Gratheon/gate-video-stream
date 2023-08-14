@@ -50,7 +50,10 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
   const server = new ApolloServer({
     schema: buildSubgraphSchema({ typeDefs: gql(typeDefs), resolvers }),
-
+    //@ts-ignore
+    cors: {
+      origin: ["https://app.gratheon.com", "http://localhost:8080", "http://0.0.0.0:8080"]
+    },
     plugins: [
       fastifyAppClosePlugin(app),
       ApolloServerPluginLandingPageGraphQLPlayground(),
