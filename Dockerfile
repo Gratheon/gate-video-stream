@@ -1,12 +1,12 @@
 FROM node:16-alpine
 
 # Install FFmpeg v5
-RUN apk add --no-cache ffmpeg=6.0-r15
+RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
 EXPOSE 8900
+EXPOSE 8950
 
 COPY package*.json ./
-
 RUN npm install
