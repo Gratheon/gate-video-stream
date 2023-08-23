@@ -107,7 +107,6 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
   await initStorage(logger);
 
-
   try {
     const server = fastify({
       logger,

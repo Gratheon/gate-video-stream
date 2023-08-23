@@ -22,6 +22,14 @@ export function storage() {
 }
 
 export async function initStorage(logger) {
+  const conn = createConnectionPool(
+    `mysql://${config.mysql.user}:${config.mysql.password}@${config.mysql.host}:${config.mysql.port}/`
+  );
+
+  await conn.query(sql`
+  CREATE DATABASE IF NOT EXISTS \`gate-video-stream\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+`);
+
   db = createConnectionPool({
     connectionString: `mysql://${config.mysql.user}:${config.mysql.password}@${config.mysql.host}:${config.mysql.port}/${config.mysql.database}`,
     onQueryError: (_query, { text }, err) => {

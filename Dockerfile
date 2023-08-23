@@ -5,8 +5,11 @@ RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
+COPY . /app/
+RUN npm install
+RUN npm run build
+
 EXPOSE 8900
 EXPOSE 8950
 
-COPY package*.json ./
-RUN npm install
+CMD ["node", "/app/app/gate-video-stream.js"]

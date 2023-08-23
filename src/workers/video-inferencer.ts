@@ -32,8 +32,8 @@ async function analyzeGateVideo() {
 	const file = await segmentModel.getFirstUnprocessed();
 
 	if (file == null) {
-		setTimeout(analyzeGateVideo, 5000);
-		logger.info('empty queue, 5s..');
+		setTimeout(analyzeGateVideo, 10000);
+		logger.info('empty queue, 10s..');
 		return
 	}
 
