@@ -2,15 +2,16 @@ import { sql } from "@databases/mysql";
 
 import { storage } from "./storage";
 import config from "../config/index";
+import segmentModel from "./segment"
 
 export default {
   generateHlsPlaylist: async function (userId, boxId, streamId) {
-    const baseUrl = `${config.files_base_url}${userId}/gate_videos/${boxId}/${streamId}/`
+    
     const count = await this.getStreamMaxChunk(userId, streamId)
 
     let segments = ""
     for (let i = 1; i <= count; i++) {
-      segments += `#EXTINF:10.0,\n${baseUrl}${i}.mp4\n`
+      segments += `#EXTINF:10.0,\n${segmentModel.getUrl(userId, boxId, streamId, i)}\n`
     }
 
     return `#EXTM3U
@@ -20,6 +21,7 @@ ${segments}
 #EXT-X-ENDLIST`;
 
   },
+
   list: async function (userId, boxIds, active): Promise<[number | null, number]> {
     let streams;
     if (active) {
@@ -43,6 +45,7 @@ ${segments}
 
     return streams;
   },
+  
   getActiveStreamMaxChunk: async function (userId, boxId): Promise<[number | null, number]> {
     const result = await storage().query(
       sql`SELECT id, max_segment

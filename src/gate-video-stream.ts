@@ -20,6 +20,7 @@ import config from "./config/index";
 import { logger } from "./logger";
 import './sentry';
 import streamModel from './models/stream'
+import { loopAnalyzeGateVideo } from './workers/video-inferencer'
 
 function fastifyAppClosePlugin(app) {
   return {
@@ -120,6 +121,9 @@ async function startApolloServer(app, typeDefs, resolvers) {
     await server.listen(process.env.PORT, "0.0.0.0");
     logger.info(`Graphql server ready at http://localhost:${process.env.PORT}${relPath}`);
 
+    // worker
+    logger.info(`Starting async worker`);
+    loopAnalyzeGateVideo()
 
     // REST server
     const restServer = fastify({

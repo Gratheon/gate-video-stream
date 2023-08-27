@@ -13,11 +13,14 @@ CREATE TABLE IF NOT EXISTS `segments` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int unsigned NOT NULL,
   `stream_id` int unsigned NOT NULL,
-  `add_time` datetime DEFAULT NOW(),
+  `chunk_id` int DEFAULT NULL,
+  `add_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `process_start_time` datetime DEFAULT NULL,
   `process_end_time` datetime DEFAULT NULL,
-
-  `bees_in` int unsigned NULL,
-  `bees_out` int unsigned NULL,
+  `bees_in` int unsigned DEFAULT NULL,
+  `bees_out` int unsigned DEFAULT NULL,
+  `varroa_count` int DEFAULT NULL,
+  `wespen_count` int DEFAULT NULL,
+  `pollen_count` int DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
