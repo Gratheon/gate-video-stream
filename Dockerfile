@@ -12,5 +12,5 @@ RUN npm run build
 EXPOSE 8900
 EXPOSE 8950
 
-CMD ["npm", "run", "start"]
-# CMD ["node", "/app/app/gate-video-stream.js"]
+# CMD ["npm", "run", "start"]
+CMD ["node", "/app/app/gate-video-stream.js"]

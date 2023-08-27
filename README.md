@@ -3,8 +3,9 @@ Main video processng microservice.
 
 - Exposes /graphql endpoint to upload short 5s videos from hive entrances
 - Uploads it to S3 for long-term storage
+- Posts video to inference
+- Stores results in DB
 - Exposes /hls REST endpoint for video playback in web-app
-- [TODO] Posts video to inference
 
 ### URLs
 localhost:8900
