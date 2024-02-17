@@ -35,7 +35,7 @@
     "build": "./node_modules/.bin/tsc -p ./src/config/tsconfig.json",
     "test": "./node_modules/.bin/jest --config ./test/unit/jest.coverage.json",
     "start": "./node_modules/.bin/tsc-watch --project ./src/config/tsconfig.json --onSuccess \"node ./app/gate-video-stream.js\"",
-    "generate-db-schema": "npx @databases/mysql-schema-cli --database mysql://root:test@localhost:60003/ --schemaName gate-video-stream --directory app/models/__generated__"
+    "generate-db-schema": "npx @databases/mysql-schema-cli --database mysql://root:test@localhost:5100/ --schemaName gate-video-stream --directory app/models/__generated__"
   },
   "repository": {
     "type": "git",
