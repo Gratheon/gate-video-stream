@@ -1,11 +1,10 @@
 version: '3.9'
 services:
   gate-video-stream:
-    image: local/gate-video-stream
-    # build: 
-    #   dockerfile: ./Dockerfile.dev
-    # command:
-    #   ./node_modules/.bin/tsc-watch --project ./src/config/tsconfig.json --onSuccess "node ./app/gate-video-stream.js"
+    build: 
+      dockerfile: ./Dockerfile.dev
+    command:
+      ./node_modules/.bin/tsc-watch --project ./src/config/tsconfig.json --onSuccess "node ./app/gate-video-stream.js"
     environment:
       - ENV_ID=dev
       - PORT=8900
@@ -13,8 +12,8 @@ services:
     ports:
       - 8900:8900
       - 8950:8950
-    # volumes:
-    #   - .:/app/
+    volumes:
+      - .:/app/
     restart: always
     network_mode: bridge
     networks:

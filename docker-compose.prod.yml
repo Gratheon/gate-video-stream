@@ -1,7 +1,8 @@
 version: '3.8'
 services:
   gate-video-stream:
-    build: .
+    build: 
+      dockerfile: ./Dockerfile.prod
     command:
       node /app/app/gate-video-stream.js
     environment:
@@ -10,7 +11,7 @@ services:
     ports:
       - 8900:8900
       - 8950:8950
-    volumes:
-      - .:/app/
+    # volumes:
+    #   - .:/app/
     restart: always
     network_mode: host
