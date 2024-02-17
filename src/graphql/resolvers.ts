@@ -26,18 +26,14 @@ export const resolvers = {
 				// local file
 				const { createReadStream } = await file;
 
-				let ctx = {
-					userID,
-					boxID,
-					streamID,
-					chunkID
-				}
+				let ctx = { userID, boxID, streamID, chunkID }
 				logger.info("Uploading video file", ctx)
 
 				if (streamID) {
 					await streamModel.increment(userID, streamID)
 				}
 
+				// path inside the container
 				let webmFilePath = `/app/tmp/${userID}_${chunkID}.webm`
 				await segmentModel.writeWebmFile(createReadStream, webmFilePath)
 
@@ -60,12 +56,7 @@ export const resolvers = {
 					await streamModel.insert(userID, boxID);
 					[streamID, chunkID] = await streamModel.getActiveStreamMaxChunk(userID, boxID)
 
-					let ctx = {
-						userID,
-						boxID,
-						streamID,
-						chunkID
-					}
+					let ctx = { userID, boxID, streamID, chunkID }
 					logger.info('Created new stream', ctx)
 				}
 

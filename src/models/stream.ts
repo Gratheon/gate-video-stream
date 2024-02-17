@@ -46,11 +46,13 @@ ${segments}
     return streams;
   },
   
-  getActiveStreamMaxChunk: async function (userId, boxId): Promise<[number | null, number]> {
+  getActiveStreamMaxChunk: async function (userId, boxId, maxStreamTTLSec = 600): Promise<[number | null, number]> {
     const result = await storage().query(
       sql`SELECT id, max_segment
       FROM streams 
-      WHERE user_id=${userId} AND box_id=${boxId} AND end_time is NULL AND NOW() - last_upload_time < 60`
+      WHERE user_id=${userId} AND box_id=${boxId} AND end_time is NULL AND NOW() - last_upload_time < ${maxStreamTTLSec}
+      ORDER BY last_upload_time DESC
+      LIMIT 1`
     );
 
     const rel = result[0];

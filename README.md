@@ -1,9 +1,9 @@
 # gratheon / gate-video-stream
 Main video processng microservice.
 
-- Exposes /graphql endpoint to upload short 5s videos from hive entrances
+- Exposes /graphql endpoint to upload short 10s videos from hive entrances
 - Uploads it to S3 for long-term storage
-- Posts video to inference
+- [TODO] Posts video to inference
 - Stores results in DB
 - Exposes /hls REST endpoint for video playback in web-app
 
@@ -26,6 +26,10 @@ flowchart LR
     web-app("<a href='https://github.com/Gratheon/web-app'>web-app</a>\n:8080") --> graphql-router("<a href='https://github.com/Gratheon/graphql-router'>graphql-router</a>") --"list video stream URLs"--> gate-video-stream("<a href='https://github.com/Gratheon/gate-video-stream'>gate-video-stream</a>\n:8900") -- "get data for playback" --> mysql
 
 ```
+
+### Database
+- Stream - video session that has multiple 10s segments. 
+- Segment - part of the stream. Contains statistics on found bees coming in/out.
 
 ### Development
 ```

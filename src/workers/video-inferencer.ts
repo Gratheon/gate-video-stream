@@ -34,7 +34,6 @@ export async function loopAnalyzeGateVideo() {
 
 	if (videoSegment == null) {
 		setTimeout(loopAnalyzeGateVideo, 10000);
-		logger.info('empty queue, 10s..');
 		return
 	}
 
