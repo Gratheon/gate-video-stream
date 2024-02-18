@@ -10,7 +10,6 @@
     "sourceMap": true,
     "outDir": "../../app",
     "baseUrl": "./",
-
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
@@ -21,6 +20,13 @@
     "preserveConstEnums": true,
     "esModuleInterop": true,
     "strict": true,
-    "allowJs": true
+    "allowJs": true,
+    "typeRoots": [
+      "node_modules/@types"
+    ],
+    "types": [
+      "node",
+      "jest"
+    ]
   }
 }
