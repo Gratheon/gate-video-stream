@@ -13,19 +13,43 @@ export const resolvers = {
 	Query: {
 		hello: 'world',
 		videoStreams: async (_, { active, boxIds }, { uid }) => {
+			if (!uid) {
+				return false;
+			}
+
 			return await streamModel.list(uid, boxIds, active)
+		},
+		fetchNextUnprocessedVideoSegment: async(_, __, { uid }) => {
+			if (!uid) {
+				return null;
+			}
+
+			return await segmentModel.getFirstUnprocessed();
 		}
 	},
 	Mutation: {
+		updateVideoSegmentDetectionStats: async (_, { id, detectionStats }, { uid }) => {
+			console.log({id, detectionStats})
+			if (!uid) {
+				logger.error('Unauthorized attempt to update video segment detection stats', { id, detectionStats })
+				return null;
+			}
+
+			return await segmentModel.updateDetections(id, detectionStats);
+		},
+
+		// todo change schema to return graphql ERR type instead of boolean
 		uploadGateVideo: async (_, { file, boxId: boxID }, { uid: userID }) => {
 			try {
+				if (!userID) {
+					return false;
+				}
 
 				let [streamID, chunkID] = await streamModel.getActiveStreamMaxChunk(userID, boxID)
 				chunkID = chunkID + 1;
 
 				// local file
 				const fileInternals = await file;
-				console.log({ fileInternals })
 				let { createReadStream } = fileInternals
 
 				let ctx = { userID, boxID, streamID, chunkID }

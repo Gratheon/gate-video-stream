@@ -23,12 +23,13 @@ flowchart LR
 	web-app --"get /hls video playlist"--> gate-video-stream
 	raspberry-pi-client("<a href='https://github.com/Gratheon/raspberry-pi-client'>raspberry-pi-client</a>") --"upload"--> gate-video-stream
 	gate-video-stream --"store unprocessed files" --> mysql
- 	gate-video-stream --"[worker] inference unprocessed file" --> models-gate-tracker
-	gate-video-stream --"[worker] store results long-term" --> mysql
-	gate-video-stream -- "[worker] post results as events" --> redis --> event-stream-filter
-        
 
     web-app("<a href='https://github.com/Gratheon/web-app'>web-app</a>\n:8080") --> graphql-router("<a href='https://github.com/Gratheon/graphql-router'>graphql-router</a>") --"list video stream URLs"--> gate-video-stream("<a href='https://github.com/Gratheon/gate-video-stream'>gate-video-stream</a>\n:8900") -- "get data for playback" --> mysql
+
+	beehive-entrance-video-processor("<a href='https://github.com/Gratheon/beehive-entrance-video-processor'>beehive-entrance-video-processor</a>") --"get next unprocessed video segment"--> gate-video-stream
+	beehive-entrance-video-processor --"inference unprocessed file" --> models-gate-tracker
+	beehive-entrance-video-processor --"send inference results"--> gate-video-stream -- "store results long-term" --> mysql
+	gate-video-stream -- "post results as events" --> redis --> event-stream-filter
 
 ```
 

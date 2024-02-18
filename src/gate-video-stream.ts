@@ -123,8 +123,8 @@ async function startApolloServer(app, typeDefs, resolvers) {
     logger.info(`Graphql server ready at http://localhost:${process.env.PORT}${relPath}`);
 
     // worker
-    logger.info(`Starting async worker`);
-    loopAnalyzeGateVideo()
+    // logger.info(`Starting async worker`);
+    // loopAnalyzeGateVideo()
 
     // REST server
     await startRestAPI();

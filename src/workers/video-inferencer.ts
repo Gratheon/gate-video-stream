@@ -4,10 +4,8 @@ import FormData from 'form-data';
 import fetch from "node-fetch";
 
 import { logger } from '../logger';
-import streamModel from '../models/stream';
 import segmentModel from '../models/segment';
 import config from '../config';
-import { publisher, generateChannelName } from '../redisPubSub'
 
 async function downloadFile(url, localPath) {
 	return new Promise((resolve, reject) => {
@@ -50,9 +48,6 @@ export async function loopAnalyzeGateVideo() {
 		await segmentModel.startDetection(videoSegment.id);
 
 		await detectGateBeesOnVideoSegment(videoSegment);
-
-		// await fileModel.endDetection(file.file_id, file.frame_side_id);
-		// fs.unlinkSync(file.localFilePath);
 	}
 	catch (e) {
 		logger.error(e)
@@ -80,14 +75,7 @@ async function detectGateBeesOnVideoSegment(segment) {
 
 		logger.info("Received response")
 		logger.info({detectionStats})
-		// wespenCount: 0
-		// varroaCount: 0
-		// pollenCount: 0
-		// coolingCount: 0
-		// beesIn: 0
-		// beesOut: 0
-		// processedFames: 327
-
+		
 		await segmentModel.updateDetections(
 			segment.id,
 			detectionStats

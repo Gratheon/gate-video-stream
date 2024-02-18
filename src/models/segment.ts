@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { logger } from '../logger';
 
 export default {
+
   writeToFileFromStream: async function (readStream, targetFilePath: string) {
     const writeStream = fs.createWriteStream(targetFilePath);
 
@@ -76,7 +77,7 @@ export default {
 
   getFirstUnprocessed: async function () {
     const result = await storage().query(
-      sql`SELECT t1.id, t1.user_id, t1.stream_id, t1.chunk_id, t2.box_id
+      sql`SELECT t1.id, t1.user_id, t1.stream_id, t1.chunk_id, t1.add_time as addTime, t2.box_id
 			FROM segments t1
       INNER JOIN streams t2 ON t2.id=t1.stream_id
 			WHERE process_start_time IS NULL
@@ -92,8 +93,7 @@ export default {
 
     segment.filename = `${segment.chunk_id}.mp4`
     segment.URL = this.getUrl(segment.user_id, segment.box_id, segment.stream_id, segment.chunk_id)
-    const [file, localPath] = this.getLocalTmpFile(segment.user_id, segment.chunk_id)
-    segment.localFilePath = localPath
+
     return segment;
   },
 
@@ -111,17 +111,19 @@ export default {
     return [uploadedFilename, mp4File]
   },
 
+  // TODO introduce quorum mechanism in stats update
+  // to protect from potential attacks, although we can block by UID if that happens
   updateDetections: async function(id, detectionStats){
     // @ts-ignore
     await storage().query(sql`
     UPDATE segments
     SET process_end_time = NOW(),
-    bees_in = ${detectionStats.beesIn},
-    bees_out = ${detectionStats.beesOut},
-    wespen_count = ${detectionStats.wespenCount},
-    varroa_count = ${detectionStats.varroaCount},
-    pollen_count = ${detectionStats.pollenCount}
-    WHERE id = ${id};
+      bees_in = ${detectionStats.beesIn},
+      bees_out = ${detectionStats.beesOut},
+      wespen_count = ${detectionStats.wespenCount},
+      varroa_count = ${detectionStats.varroaCount},
+      pollen_count = ${detectionStats.pollenCount}
+    WHERE id = ${id} AND process_end_time IS NULL;
     `);
   }
 };
