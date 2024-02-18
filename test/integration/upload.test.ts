@@ -6,7 +6,7 @@ import path from 'path';
 
 describe('GraphQL Video Upload Test', () => {
   it('should upload mp4 video file to GraphQL endpoint', async () => {
-    const videoFile = 'bees.mp4';
+    const videoFile = 'bees-2mb.mp4';
     const graphqlEndpoint = 'http://localhost:8900/graphql';
 
     // Read the video file and create a FormData object
@@ -31,7 +31,7 @@ describe('GraphQL Video Upload Test', () => {
     }));
 
     // Add the video file
-    const fileContents = fs.readFileSync(path.resolve(__dirname, 'bees.mp4'));
+    const fileContents = fs.readFileSync(path.resolve(__dirname, videoFile));
     formData.append('0', fileContents, {
       filename: videoFile,
       contentType: 'video/mp4', // Adjust content type according to your video file
