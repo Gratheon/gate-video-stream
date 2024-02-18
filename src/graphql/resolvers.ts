@@ -24,7 +24,9 @@ export const resolvers = {
 				chunkID = chunkID + 1;
 
 				// local file
-				const { createReadStream } = await file;
+				const fileInternals = await file;
+				console.log({ fileInternals })
+				let { createReadStream } = fileInternals
 
 				let ctx = { userID, boxID, streamID, chunkID }
 				logger.info("Uploading video file", ctx)
@@ -33,21 +35,33 @@ export const resolvers = {
 					await streamModel.increment(userID, streamID)
 				}
 
-				// path inside the container
-				let webmFilePath = `/app/tmp/${userID}_${chunkID}.webm`
-				await segmentModel.writeWebmFile(createReadStream, webmFilePath)
 
-				logger.info("Wrote webm", ctx)
-
+				// processed local and uploaded file paths
 				let [uploadedFilename, mp4File] = segmentModel.getLocalTmpFile(userID, chunkID)
+				// path inside the container
+				let tmpLocalFilePath = `/app/tmp/${userID}_${chunkID}`
 
-				await segmentModel.convertWebmToMp4(webmFilePath, mp4File)
-				logger.info("Converted webm -> mp4", ctx)
+				// chrome browser sends only webm
+				if (fileInternals.mimetype == 'video/webm') {
+					tmpLocalFilePath = `${tmpLocalFilePath}.webm`
+					await segmentModel.writeToFileFromStream(createReadStream, tmpLocalFilePath)
+					await segmentModel.convertWebmToMp4(tmpLocalFilePath, mp4File)
+					logger.info("Converted webm -> mp4", ctx)
 
-				try {
-					fs.unlinkSync(webmFilePath);
-				} catch (err) {
-					logger.error('Error deleting webm file:', err, ctx);
+					try {
+						fs.unlinkSync(tmpLocalFilePath);
+					} catch (err) {
+						logger.error('Error deleting webm file:', err, ctx);
+					}
+				}
+
+				// other integrations may send mp4 directly
+				else if (fileInternals.mimetype == 'video/mp4') {
+					mp4File = `${tmpLocalFilePath}.mp4`
+					await segmentModel.writeToFileFromStream(createReadStream, mp4File)
+				}
+				else{
+					throw new Error(`Unsupported file MIME type: ${fileInternals.mimetype}`)
 				}
 
 				// db

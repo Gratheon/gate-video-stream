@@ -70,7 +70,8 @@ async function startApolloServer(app, typeDefs, resolvers) {
       let signature = req.request.raw.headers["internal-router-signature"];
 
       // signature sent by router so that it cannot be faked
-      if (signature === config.routerSignature) {
+      // also allow faking users in dev/test env
+      if (signature === config.routerSignature || process.env.ENV_ID === "dev") {
         uid = req.request.raw.headers["internal-userid"];
       }
 
@@ -126,35 +127,41 @@ async function startApolloServer(app, typeDefs, resolvers) {
     loopAnalyzeGateVideo()
 
     // REST server
-    const restServer = fastify({
-      logger,
-    });
-  
-    restServer.register(cors, {
-      origin: '*',
-      methods: ['GET', 'POST', 'PUT', 'DELETE']
-    });
-  
-    restServer.route({
-      method: 'GET',
-      url: '/hls/:uid/:boxId/:streamId/playlist.m3u8',
-      handler: async function (request, reply) {
-        reply.header('Content-Type', 'application/vnd.apple.mpegurl');
-        const playlist = await streamModel.generateHlsPlaylist(
-          //@ts-ignore
-          request.params.uid,
-          //@ts-ignore
-          request.params.boxId,
-          //@ts-ignore
-          request.params.streamId
-        )
-        reply.send(playlist)
-      }
-    })
-    await restServer.listen(8950, "0.0.0.0");
+    await startRestAPI();
 
     logger.info(`Server ready at http://localhost:8950`);
   } catch (e) {
     console.error(e);
   }
 })();
+
+
+async function startRestAPI() {
+  const restServer = fastify({
+    logger,
+  });
+
+  restServer.register(cors, {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
+  });
+
+  restServer.route({
+    method: 'GET',
+    url: '/hls/:uid/:boxId/:streamId/playlist.m3u8',
+    handler: async function (request, reply) {
+      reply.header('Content-Type', 'application/vnd.apple.mpegurl');
+      const playlist = await streamModel.generateHlsPlaylist(
+        //@ts-ignore
+        request.params.uid,
+        //@ts-ignore
+        request.params.boxId,
+        //@ts-ignore
+        request.params.streamId
+      );
+      reply.send(playlist);
+    }
+  });
+  await restServer.listen(8950, "0.0.0.0");
+}
+

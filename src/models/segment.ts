@@ -7,8 +7,8 @@ import { storage } from "./storage";
 import { logger } from '../logger';
 
 export default {
-  writeWebmFile: async function (readStream, webmFilePath) {
-    const writeStream = fs.createWriteStream(webmFilePath);
+  writeToFileFromStream: async function (readStream, targetFilePath: string) {
+    const writeStream = fs.createWriteStream(targetFilePath);
 
     // Pipe the uploaded file's readable stream to the writable stream
     await new Promise((resolve, reject) => {
