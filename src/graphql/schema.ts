@@ -11,7 +11,7 @@ type Query {
 
 type Mutation {
 	uploadGateVideo(file: Upload!, boxId: ID!): Boolean
-	updateVideoSegmentDetectionStats(id: ID!, detectionStats: DetectionStats): Boolean
+	updateVideoSegmentDetectionStats(id: ID!, detectionStats: DetectionStats!): Boolean
 }
 
 input DetectionStats {
