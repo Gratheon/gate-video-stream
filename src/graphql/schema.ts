@@ -20,6 +20,8 @@ input DetectionStats {
 	wespenCount: Int
 	varroaCount: Int
 	pollenCount: Int
+	coolingCount: Int
+	processedFrames: Int
 }
 
 type VideoStream {
