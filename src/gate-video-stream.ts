@@ -71,7 +71,7 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
       // signature sent by router so that it cannot be faked
       // also allow faking users in dev/test env
-      if (signature === config.routerSignature || process.env.ENV_ID === "dev") {
+      if (signature === config.routerSignature) {
         uid = req.request.raw.headers["internal-userid"];
       }
 

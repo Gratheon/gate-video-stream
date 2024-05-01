@@ -21,7 +21,7 @@ Main video processng microservice.
 flowchart LR
 	web-app --"upload /graphql"--> gate-video-stream --"store for re-training with 1 month TTL"--> S3
 	web-app --"get /hls video playlist"--> gate-video-stream
-	raspberry-pi-client("<a href='https://github.com/Gratheon/raspberry-pi-client'>raspberry-pi-client</a>") --"upload"--> gate-video-stream
+	beehive-entrance-video-processor --"upload video chunk"--> gate-video-stream
 	gate-video-stream --"store unprocessed files" --> mysql
 
     web-app("<a href='https://github.com/Gratheon/web-app'>web-app</a>\n:8080") --> graphql-router("<a href='https://github.com/Gratheon/graphql-router'>graphql-router</a>") --"list video stream URLs"--> gate-video-stream("<a href='https://github.com/Gratheon/gate-video-stream'>gate-video-stream</a>\n:8900") -- "get data for playback" --> mysql
