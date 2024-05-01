@@ -9,7 +9,7 @@ services:
     environment:
       - ENV_ID=dev
       - PORT=8900
-    # tty: true
+    tty: true
     ports:
       - 8900:8900
       - 8950:8950

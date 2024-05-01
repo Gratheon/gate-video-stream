@@ -42,6 +42,7 @@ export const resolvers = {
 		uploadGateVideo: async (_, { file, boxId: boxID }, { uid: userID }) => {
 			try {
 				if (!userID) {
+					logger.info("Unauthorized, failing response")
 					return false;
 				}
 
@@ -58,7 +59,6 @@ export const resolvers = {
 				if (streamID) {
 					await streamModel.increment(userID, streamID)
 				}
-
 
 				// processed local and uploaded file paths
 				let [uploadedFilename, mp4File] = segmentModel.getLocalTmpFile(userID, chunkID)
@@ -123,7 +123,7 @@ export const resolvers = {
 				return true
 
 			} catch (err) {
-				console.error(err);
+				logger.error(err);
 				return false;
 			}
 		},
