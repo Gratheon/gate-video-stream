@@ -41,6 +41,7 @@ export const resolvers = {
 		// todo change schema to return graphql ERR type instead of boolean
 		uploadGateVideo: async (_, { file, boxId: boxID }, { uid: userID }) => {
 			try {
+				console.log('uploadGateVideo')
 				if (!userID) {
 					logger.info("Unauthorized, failing response")
 					return false;
