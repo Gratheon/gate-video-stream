@@ -6,6 +6,9 @@ import config from "../config/index";
 import { storage } from "./storage";
 import { logger } from '../logger';
 
+const outputResolution = '640x480'
+const bitrate = '3000'
+
 export default {
 
   writeToFileFromStream: async function (readStream, targetFilePath: string) {
@@ -20,7 +23,7 @@ export default {
   },
 
   convertWebmToMp4: async function (webmFilePath, mp4FilePath) {
-    console.log('reading ' + webmFilePath)
+    logger.info('reading ' + webmFilePath)
     return new Promise((resolve, reject) => {
       ffmpeg(webmFilePath)
         // .inputOptions('-c:v libvpx') // Input codec for WebM
@@ -31,29 +34,66 @@ export default {
           '-movflags frag_keyframe+empty_moov+default_base_moof',
           '-f mp4',
         ])
-        .videoBitrate('3000')
+        .videoBitrate(bitrate)
         .on('end', () => {
-          console.log('Conversion finished');
+          logger.info('Conversion finished');
           resolve(true)
         })
         .on('error', (err) => {
-          console.error('FFmpeg error:', err);
-          console.error('FFmpeg stderr:', err.stderr);
-          console.error('FFmpeg stdout:', err.stdout);
+          logger.error('FFmpeg error:', err);
+          logger.error('FFmpeg stderr:', err.stderr);
+          logger.error('FFmpeg stdout:', err.stdout);
           reject(err)
         })
         .on('exit', (code, signal) => {
           if (code === 0) {
-            console.log('FFmpeg process exited successfully');
+            logger.info('FFmpeg process exited successfully');
             resolve(true)
           } else {
-            console.error('FFmpeg process exited with code:', code);
+            logger.error('FFmpeg process exited with code:', code);
             reject(code)
           }
         })
         .noAudio()
-        // .size('1920x1080')
+        .size(outputResolution)
         .save(mp4FilePath);
+    })
+  },
+  convertMp4ToMp4: async function (inputMP4FilePath, outputMP4FilePath) {
+    logger.info('reading ' + inputMP4FilePath)
+    return new Promise((resolve, reject) => {
+      ffmpeg(inputMP4FilePath)
+        // .inputOptions('-c:v libvpx') // Input codec for WebM
+        // .outputOptions('-c:v libx264') // Output codec for MP4
+        .outputOptions([
+          '-c:v libx264',
+          '-strict experimental',
+          '-movflags frag_keyframe+empty_moov+default_base_moof',
+          '-f mp4',
+        ])
+        .videoBitrate(bitrate)
+        .on('end', () => {
+          logger.info('Conversion finished');
+          resolve(true)
+        })
+        .on('error', (err) => {
+          logger.error('FFmpeg error:', err);
+          logger.error('FFmpeg stderr:', err.stderr);
+          logger.error('FFmpeg stdout:', err.stdout);
+          reject(err)
+        })
+        .on('exit', (code, signal) => {
+          if (code === 0) {
+            logger.info('FFmpeg process exited successfully');
+            resolve(true)
+          } else {
+            logger.error('FFmpeg process exited with code:', code);
+            reject(code)
+          }
+        })
+        .noAudio()
+        .size(outputResolution)
+        .save(outputMP4FilePath);
     })
   },
 

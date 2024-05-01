@@ -82,7 +82,15 @@ export const resolvers = {
 				// other integrations may send mp4 directly
 				else { //if (fileInternals.mimetype == 'video/mp4') {
 					mp4File = `${tmpLocalFilePath}.mp4`
-					await segmentModel.writeToFileFromStream(createReadStream, mp4File)
+					tmpLocalFilePath = `${tmpLocalFilePath}_orig.mp4`
+					await segmentModel.writeToFileFromStream(createReadStream, tmpLocalFilePath)
+					await segmentModel.convertMp4ToMp4(tmpLocalFilePath, mp4File)
+
+					try {
+						fs.unlinkSync(tmpLocalFilePath);
+					} catch (err) {
+						logger.error('Error deleting original mp4 file:', err, ctx);
+					}
 				}
 				// else{
 				// 	throw new Error(`Unsupported file MIME type: ${fileInternals.mimetype}`)
