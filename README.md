@@ -1,11 +1,16 @@
 # gratheon / gate-video-stream
-Main video processng microservice.
+Main backend video processng microservice.
+In UI videos are uploaded from this component:
+![Screenshot 2024-05-01 at 23 39 40](https://github.com/Gratheon/gate-video-stream/assets/445122/c1d211e7-d686-4930-8957-0133f612bb57)
 
+## Features
 - Converts webm videos to mp4 for HLS playback
 - Uploads short 10s video segments to S3 for long-term storage
-- Posts video to inference
-- Stores detected results in DB
+- Stores some results in mysql db
+- Theoretically can post videos to be inferenced, but not in use yet as we don't have GPU hosting enabled. Relying on edge devices for now.
 
+## Limits
+Max - 40 MB video file size limit.
 
 ### API
 - Exposes /hls REST endpoint for video playback in web-app
@@ -41,6 +46,3 @@ flowchart LR
 ```
 make start
 ```
-
-## Limits
-Max - 40 MB video file size limit.
