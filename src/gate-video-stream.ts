@@ -62,12 +62,14 @@ async function startApolloServer(app, typeDefs, resolvers) {
     ],
     // @ts-ignore
     uploads: {
-      maxFileSize: 50000000, // 50 MB
+      maxFileSize: 40000000, // 40 MB, see nginx config too
       maxFiles: 1,
     },
     context: async (req) => {
       let uid;
       let signature = req.request.raw.headers["internal-router-signature"];
+
+      const bearer = req.request.raw.headers['authorization'];
 
       // signature sent by router so that it cannot be faked
       // also allow faking users in dev/test env
@@ -75,7 +77,43 @@ async function startApolloServer(app, typeDefs, resolvers) {
         uid = req.request.raw.headers["internal-userid"];
       }
 
-      // allow direct access in case of upload
+      // API tokens are managed by the user - https://app.gratheon.com/account
+      else if (bearer) {
+        const bearerToken = bearer.split(' ')[1]
+
+        // Define the GraphQL endpoint URL
+        const endpoint = `${config.userCycleUrl}/graphql`;
+
+        // Make a POST request with the fetch API
+        const bearerTokenValidationResult = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // You may need to include other headers like authorization if required
+          },
+          body: JSON.stringify({
+            query: `
+                mutation ValidateApiToken($token: String) {
+                  validateApiToken(token: $token) {
+                    ... on TokenUser{
+                        id
+                    }
+                  }
+                }
+              `,
+            variables: {
+              token: bearerToken
+            },
+          }),
+        })
+
+        const bearerTokenValidationResultJSON = await bearerTokenValidationResult.json()
+
+        uid = bearerTokenValidationResultJSON?.data?.validateApiToken?.id
+      }
+
+      // allow direct access in case of upload, use token from header
+      // JWT token is sent by the browser, its a session token
       else {
         const token = req.request.raw.headers.token;
         const decoded = await new Promise((resolve, reject) =>

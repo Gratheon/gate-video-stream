@@ -10,6 +10,9 @@ export default {
 	// external service url for inferencing
     models_gate_tracker_url: "http://models-gate-tracker:9100/",
 
+    // user-cycle service url, needed to verify apiTokens for direct API video uploads
+    userCycleUrl: 'http://user-cycle:4000',
+
 	// set own db
     mysql: {
         host: process.env.NATIVE ? 'localhost': 'mysql',
