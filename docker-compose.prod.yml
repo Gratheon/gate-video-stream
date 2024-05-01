@@ -4,7 +4,6 @@ services:
     build:
       context: . 
       dockerfile: ./Dockerfile.prod
-    tty: true
     command:
       node /app/app/gate-video-stream.js
     environment:
