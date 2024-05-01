@@ -20,7 +20,8 @@ import config from "./config/index";
 import { logger } from "./logger";
 import './sentry';
 import streamModel from './models/stream'
-import { loopAnalyzeGateVideo } from './workers/video-inferencer'
+// import { loopAnalyzeGateVideo } from './workers/video-inferencer'
+import fetch from 'cross-fetch';
 
 function fastifyAppClosePlugin(app) {
   return {
