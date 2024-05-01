@@ -41,3 +41,6 @@ flowchart LR
 ```
 make start
 ```
+
+## Limits
+Max - 40 MB video file size limit.
