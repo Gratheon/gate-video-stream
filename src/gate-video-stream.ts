@@ -67,33 +67,35 @@ async function startApolloServer(app, typeDefs, resolvers) {
       maxFiles: 1,
     },
     context: async (req) => {
+      logger.info('loading request context')
       let uid;
       let signature = req.request.raw.headers["internal-router-signature"];
 
-      const bearer = req.request.raw.headers['authorization'];
+      try {
+        const bearer = req.request.raw.headers['authorization'];
 
-      // signature sent by router so that it cannot be faked
-      // also allow faking users in dev/test env
-      if (signature === config.routerSignature) {
-        uid = req.request.raw.headers["internal-userid"];
-      }
+        // signature sent by router so that it cannot be faked
+        // also allow faking users in dev/test env
+        if (signature === config.routerSignature) {
+          uid = req.request.raw.headers["internal-userid"];
+        }
 
-      // API tokens are managed by the user - https://app.gratheon.com/account
-      else if (bearer) {
-        const bearerToken = bearer.split(' ')[1]
+        // API tokens are managed by the user - https://app.gratheon.com/account
+        else if (bearer) {
+          const bearerToken = bearer.split(' ')[1]
 
-        // Define the GraphQL endpoint URL
-        const endpoint = `${config.userCycleUrl}/graphql`;
+          // Define the GraphQL endpoint URL
+          const endpoint = `${config.userCycleUrl}/graphql`;
 
-        // Make a POST request with the fetch API
-        const bearerTokenValidationResult = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // You may need to include other headers like authorization if required
-          },
-          body: JSON.stringify({
-            query: `
+          // Make a POST request with the fetch API
+          const bearerTokenValidationResult = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              // You may need to include other headers like authorization if required
+            },
+            body: JSON.stringify({
+              query: `
                 mutation ValidateApiToken($token: String) {
                   validateApiToken(token: $token) {
                     ... on TokenUser{
@@ -102,39 +104,43 @@ async function startApolloServer(app, typeDefs, resolvers) {
                   }
                 }
               `,
-            variables: {
-              token: bearerToken
-            },
-          }),
-        })
-
-        const bearerTokenValidationResultJSON = await bearerTokenValidationResult.json()
-
-        uid = bearerTokenValidationResultJSON?.data?.validateApiToken?.id
-      }
-
-      // allow direct access in case of upload, use token from header
-      // JWT token is sent by the browser, its a session token
-      else {
-        const token = req.request.raw.headers.token;
-        const decoded = await new Promise((resolve, reject) =>
-          jwt.verify(token, config.jwt.privateKey, function (err, decoded) {
-            if (err) {
-              reject(err);
-            }
-            resolve(decoded);
+              variables: {
+                token: bearerToken
+              },
+            }),
           })
-        ) as {
-          user_id: string
+
+          const bearerTokenValidationResultJSON = await bearerTokenValidationResult.json()
+
+          uid = bearerTokenValidationResultJSON?.data?.validateApiToken?.id
+        }
+
+        // allow direct access in case of upload, use token from header
+        // JWT token is sent by the browser, its a session token
+        else {
+          const token = req.request.raw.headers.token;
+          const decoded = await new Promise((resolve, reject) =>
+            jwt.verify(token, config.jwt.privateKey, function (err, decoded) {
+              if (err) {
+                reject(err);
+              }
+              resolve(decoded);
+            })
+          ) as {
+            user_id: string
+          };
+
+          uid = decoded?.user_id;
+        }
+
+        return {
+          uid,
         };
-
-        uid = decoded?.user_id;
       }
-
-      return {
-        uid,
-      };
-    },
+      catch (e) {
+        logger.error('Error in loading middleware context', e)
+      }
+    }
   });
 
   await server.start();
