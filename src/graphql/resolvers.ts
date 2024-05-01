@@ -80,13 +80,13 @@ export const resolvers = {
 				}
 
 				// other integrations may send mp4 directly
-				else if (fileInternals.mimetype == 'video/mp4') {
+				else { //if (fileInternals.mimetype == 'video/mp4') {
 					mp4File = `${tmpLocalFilePath}.mp4`
 					await segmentModel.writeToFileFromStream(createReadStream, mp4File)
 				}
-				else{
-					throw new Error(`Unsupported file MIME type: ${fileInternals.mimetype}`)
-				}
+				// else{
+				// 	throw new Error(`Unsupported file MIME type: ${fileInternals.mimetype}`)
+				// }
 
 				// db
 				if (!streamID) {
