@@ -4,7 +4,7 @@ import fs from 'fs'
 
 import config from "../config/index";
 import { storage } from "./storage";
-import { logger } from '../logger';
+import { log, logger } from '../logger';
 
 const outputResolution = '640x480'
 const bitrate = '3000'
@@ -60,7 +60,7 @@ export default {
     })
   },
   convertMp4ToMp4: async function (inputMP4FilePath, outputMP4FilePath) {
-    logger.info('reading ' + inputMP4FilePath)
+    log('reading ' + inputMP4FilePath)
     return new Promise((resolve, reject) => {
       ffmpeg(inputMP4FilePath)
         // .inputOptions('-c:v libvpx') // Input codec for WebM
@@ -73,7 +73,7 @@ export default {
         ])
         .videoBitrate(bitrate)
         .on('end', () => {
-          logger.info('Conversion finished');
+          log('Conversion finished');
           resolve(true)
         })
         .on('error', (err) => {
@@ -84,7 +84,7 @@ export default {
         })
         .on('exit', (code, signal) => {
           if (code === 0) {
-            logger.info('FFmpeg process exited successfully');
+            log('FFmpeg process exited successfully');
             resolve(true)
           } else {
             logger.error('FFmpeg process exited with code:', code);

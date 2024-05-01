@@ -2,7 +2,7 @@ import fs from 'fs';
 
 import { GraphQLUpload } from 'graphql-upload';
 
-import { logger } from '../logger';
+import { log, logger } from '../logger';
 import upload from '../models/s3';
 import segmentModel from '../models/segment';
 import streamModel from '../models/stream';
@@ -19,7 +19,7 @@ export const resolvers = {
 
 			return await streamModel.list(uid, boxIds, active)
 		},
-		fetchNextUnprocessedVideoSegment: async(_, __, { uid }) => {
+		fetchNextUnprocessedVideoSegment: async (_, __, { uid }) => {
 			if (!uid) {
 				return null;
 			}
@@ -29,7 +29,7 @@ export const resolvers = {
 	},
 	Mutation: {
 		updateVideoSegmentDetectionStats: async (_, { id, detectionStats }, { uid }) => {
-			console.log({id, detectionStats})
+			console.log({ id, detectionStats })
 			if (!uid) {
 				logger.error('Unauthorized attempt to update video segment detection stats', { id, detectionStats })
 				return null;
@@ -41,9 +41,8 @@ export const resolvers = {
 		// todo change schema to return graphql ERR type instead of boolean
 		uploadGateVideo: async (_, { file, boxId: boxID }, { uid: userID }) => {
 			try {
-				console.log('uploadGateVideo')
 				if (!userID) {
-					logger.info("Unauthorized, failing response")
+					log("Unauthorized, failing response")
 					return false;
 				}
 
@@ -55,14 +54,14 @@ export const resolvers = {
 				let { createReadStream } = fileInternals
 
 				let ctx = { userID, boxID, streamID, chunkID }
-				logger.info("Uploading video file", ctx)
+				log("Uploading video file", ctx)
 
 				if (streamID) {
 					await streamModel.increment(userID, streamID)
 				}
 
 				// processed local and uploaded file paths
-				let [uploadedFilename, mp4File] = segmentModel.getLocalTmpFile(userID, chunkID)
+				let [generatedChunkFilename, mp4FileResized] = segmentModel.getLocalTmpFile(userID, chunkID)
 				// path inside the container
 				let tmpLocalFilePath = `/app/tmp/${userID}_${chunkID}`
 
@@ -70,8 +69,8 @@ export const resolvers = {
 				if (fileInternals.mimetype == 'video/webm') {
 					tmpLocalFilePath = `${tmpLocalFilePath}.webm`
 					await segmentModel.writeToFileFromStream(createReadStream, tmpLocalFilePath)
-					await segmentModel.convertWebmToMp4(tmpLocalFilePath, mp4File)
-					logger.info("Converted webm -> mp4", ctx)
+					await segmentModel.convertWebmToMp4(tmpLocalFilePath, mp4FileResized)
+					log("Converted webm -> mp4", ctx)
 
 					try {
 						fs.unlinkSync(tmpLocalFilePath);
@@ -82,10 +81,17 @@ export const resolvers = {
 
 				// other integrations may send mp4 directly
 				else { //if (fileInternals.mimetype == 'video/mp4') {
-					mp4File = `${tmpLocalFilePath}.mp4`
+
 					tmpLocalFilePath = `${tmpLocalFilePath}_orig.mp4`
 					await segmentModel.writeToFileFromStream(createReadStream, tmpLocalFilePath)
-					await segmentModel.convertMp4ToMp4(tmpLocalFilePath, mp4File)
+
+					mp4FileResized = `${tmpLocalFilePath}.mp4`
+					await segmentModel.convertMp4ToMp4(tmpLocalFilePath, mp4FileResized)
+
+					log("Resized mp4", {
+						tmpLocalFilePath,
+						mp4FileResized
+					})
 
 					try {
 						fs.unlinkSync(tmpLocalFilePath);
@@ -104,23 +110,28 @@ export const resolvers = {
 					[streamID, chunkID] = await streamModel.getActiveStreamMaxChunk(userID, boxID)
 
 					let ctx = { userID, boxID, streamID, chunkID }
-					logger.info('Created new stream', ctx)
+					log('Created new stream', ctx)
 				}
 
+				log('Uploading file to S3', {
+					mp4FileResized,
+					userID, boxID, 
+					streamID, generatedChunkFilename
+				})
 				await upload(
-					fs.createReadStream(mp4File),
-					segmentModel.getFileUploadRelPath(userID, boxID, streamID, uploadedFilename)
+					fs.createReadStream(mp4FileResized),
+					segmentModel.getFileUploadRelPath(userID, boxID, streamID, generatedChunkFilename)
 				);
 
-				logger.info('Uploaded file to S3', ctx)
+				log('Uploaded file to S3', ctx)
 
 				// we want to reuse local mp4 file in a separate async worker stream
 				// to avoid re-downloading it, so schedule cleanup a bit later
-				deleteLocalMp4FileLater(mp4File)
+				deleteLocalMp4FileLater(mp4FileResized)
 
 				await segmentModel.insert(userID, streamID, chunkID);
 
-				logger.info('Saved segment info to DB', ctx)
+				log('Saved segment info to DB', ctx)
 				return true
 
 			} catch (err) {
