@@ -28,14 +28,18 @@ ${segments}
       streams = await storage().query(
         sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime, user_id as userId
       FROM streams 
-      WHERE user_id=${userId} AND box_id IN (${boxIds}) AND end_time IS NULL`
+      WHERE user_id=${userId} AND box_id IN (${boxIds}) AND end_time IS NULL
+      ORDER BY start_time DESC
+      LIMIT 20`
       );
     }
     else {
       streams = await storage().query(
         sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime, user_id as userId
       FROM streams 
-      WHERE user_id=${userId} AND box_id IN (${boxIds}) `
+      WHERE user_id=${userId} AND box_id IN (${boxIds})
+      ORDER BY start_time DESC
+      LIMIT 20`
       );
     }
 
