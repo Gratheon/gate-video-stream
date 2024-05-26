@@ -155,9 +155,8 @@ async function startApolloServer(app, typeDefs, resolvers) {
   await initStorage(logger);
 
   try {
-    const server = fastify({
-      logger,
-    });
+    // @ts-ignore
+    const server = fastify({ logger });
 
     const version = fs.readFileSync(path.resolve(".version"), "utf8");
     await registerSchema(schema, version);
@@ -182,9 +181,8 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
 
 async function startRestAPI() {
-  const restServer = fastify({
-    logger,
-  });
+  // @ts-ignore
+  const restServer = fastify({ logger });
 
   restServer.register(cors, {
     origin: '*',

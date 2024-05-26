@@ -1,7 +1,6 @@
 // Load the AWS SDK for Node.js
 import AWS, { S3 } from "aws-sdk";
 import { ManagedUpload } from "aws-sdk/clients/s3";
-import fs from "fs";
 
 import {logger} from '../logger';
 import config from "../config/index";
