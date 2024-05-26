@@ -5,7 +5,6 @@ chown www:www-data -R /www/gate-video-stream
 
 # tmp folder for videos
 sudo -u www bash -c 'mkdir -p /www/gate-video-stream/tmp'
-
 sudo -u www bash -c 'rm -rf /www/gate-video-stream/app'
 
 # installing dependencies is faster on host than in the image
