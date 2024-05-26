@@ -39,8 +39,8 @@ flowchart LR
 ```
 
 ### Database
-- Stream - video session that has multiple 10s segments. 
-- Segment - part of the stream. Contains statistics on found bees coming in/out.
+- Stream - video session that has multiple 10s segments. Stream is limited to 1h to have a reasonable amount of linked segments both in DB and in HLS playlist.
+- Segment - part of the stream. Contains statistics on found bees coming in/out. TODO: add actual statistics.
 
 ### Development
 ```
