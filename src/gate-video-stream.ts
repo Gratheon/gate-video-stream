@@ -173,7 +173,7 @@ async function startApolloServer(app, typeDefs, resolvers) {
     // REST server
     await startRestAPI();
 
-    logger.info(`Server ready at http://localhost:8950`);
+    logger.info(`📷 Server ready at http://localhost:8950`);
   } catch (e) {
     console.error(e);
   }

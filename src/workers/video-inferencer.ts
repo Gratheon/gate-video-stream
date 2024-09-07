@@ -73,8 +73,7 @@ async function detectGateBeesOnVideoSegment(segment) {
 
 		const detectionStats = await response.json();
 
-		logger.info("Received response")
-		logger.info({detectionStats})
+		logger.debug("Received response", detectionStats)
 		
 		await segmentModel.updateDetections(
 			segment.id,

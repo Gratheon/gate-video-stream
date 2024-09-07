@@ -65,7 +65,7 @@ async function migrate(logger) {
 
     // Read each .sql file and execute the SQL statements
     for (const file of sqlFiles) {
-      logger.log(`Processing DB migration ${file}`);
+      logger.info(`Processing DB migration ${file}`);
       const sqlStatement = await fs.promises.readFile(
         `./migrations/${file}`,
         "utf8"
@@ -86,7 +86,7 @@ async function migrate(logger) {
       if (rows.length === 0) {
         await db.query(sql.file(`./migrations/${file}`));
 
-        logger.log(`Successfully executed SQL from ${file}.`);
+        logger.info(`Successfully executed SQL from ${file}.`);
 
         // Store the hash in the dedicated table
         await db.query(

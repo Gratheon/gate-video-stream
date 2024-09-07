@@ -1,3 +1,4 @@
+// @ts-ignore
 import fs from 'fs';
 
 import { GraphQLUpload } from 'graphql-upload';
@@ -77,7 +78,7 @@ export const resolvers = {
 					try {
 						fs.unlinkSync(tmpLocalFilePath);
 					} catch (err) {
-						logger.error('Error deleting webm file:', err, ctx);
+						logger.errorEnriched('Error deleting webm file', err, ctx);
 					}
 				}
 
@@ -98,7 +99,7 @@ export const resolvers = {
 					try {
 						fs.unlinkSync(tmpLocalFilePath);
 					} catch (err) {
-						logger.error('Error deleting original mp4 file:', err, ctx);
+						logger.errorEnriched('Error deleting original mp4 file', err, ctx);
 					}
 				}
 				// else{

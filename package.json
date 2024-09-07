@@ -28,8 +28,7 @@
     "jwt-encode": "1.0.1",
     "node-fetch": "2.6.6",
     "sha1": "1.1.1",
-    "stripe": "8.211.0",
-    "winston": "3.8.2"
+    "stripe": "8.211.0"
   },
   "scripts": {
     "build": "./node_modules/.bin/tsc -p ./src/config/tsconfig.json",

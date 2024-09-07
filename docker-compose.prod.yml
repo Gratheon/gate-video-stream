@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   gate-video-stream:
     build:
@@ -12,7 +11,5 @@ services:
     ports:
       - 8900:8900
       - 8950:8950
-    # volumes:
-    #   - .:/app/
     restart: always
     network_mode: host
