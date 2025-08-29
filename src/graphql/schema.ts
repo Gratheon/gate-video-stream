@@ -10,7 +10,7 @@ type Query {
 }
 
 type Mutation {
-	uploadGateVideo(file: Upload!, boxId: ID!): Boolean
+	uploadGateVideo(file: Upload!, boxId: ID!, startTime: DateTime): Boolean
 	updateVideoSegmentDetectionStats(id: ID!, detectionStats: DetectionStats!): Boolean
 }
 

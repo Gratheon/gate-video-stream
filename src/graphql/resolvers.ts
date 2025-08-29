@@ -42,7 +42,7 @@ export const resolvers = {
 		},
 
 		// todo change schema to return graphql ERR type instead of boolean
-		uploadGateVideo: async (_, { file, boxId: boxID }, { uid }) => {
+		uploadGateVideo: async (_, { file, boxId: boxID, startTime }, { uid }) => {
 			try {
 				if (!uid) {
 					logger.error('Unauthorized attempt to access uploadGateVideo', { uid })
@@ -109,7 +109,7 @@ export const resolvers = {
 				// db
 				if (!streamID) {
 					await streamModel.endPreviousBoxStreams(uid, boxID);
-					await streamModel.insert(uid, boxID);
+					await streamModel.insert(uid, boxID, startTime);
 					[streamID, chunkID] = await streamModel.getActiveStreamMaxChunk(uid, boxID)
 
 					let ctx = { userID:uid, boxID, streamID, chunkID }

@@ -90,11 +90,11 @@ ${segments}
     WHERE user_id = ${userId} AND box_id = ${boxId} AND end_time IS NULL`));
   },
 
-  insert: async function (userId, boxId) {
+  insert: async function (userId, boxId, startTime) {
     // @ts-ignore
     return (await storage().query(sql`
     INSERT INTO streams (user_id, box_id, max_segment, start_time, last_upload_time) 
-    VALUES (${userId}, ${boxId}, 1, NOW(), NOW());
+    VALUES (${userId}, ${boxId}, 1, ${startTime ? startTime : sql`NOW()`}, NOW());
     SELECT LAST_INSERT_ID() as id;
     `))[0].id;
   },
