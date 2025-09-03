@@ -60,41 +60,49 @@ export default {
     })
   },
   convertMp4ToMp4: async function (inputMP4FilePath, outputMP4FilePath) {
-    logger.info('reading ' + inputMP4FilePath)
+    logger.info('reading ' + inputMP4FilePath);
     return new Promise((resolve, reject) => {
-      ffmpeg(inputMP4FilePath)
-        // .inputOptions('-c:v libvpx') // Input codec for WebM
-        // .outputOptions('-c:v libx264') // Output codec for MP4
-        .outputOptions([
-          '-c:v libx264',
-          '-strict experimental',
-          '-movflags frag_keyframe+empty_moov+default_base_moof',
-          '-f mp4',
-        ])
-        .videoBitrate(bitrate)
-        .on('end', () => {
-          logger.info('Conversion finished');
-          resolve(true)
-        })
-        .on('error', (err) => {
-          logger.error('FFmpeg error:', err);
-          logger.error('FFmpeg stderr:', err.stderr);
-          logger.error('FFmpeg stdout:', err.stdout);
-          reject(err)
-        })
-        .on('exit', (code, signal) => {
-          if (code === 0) {
-            logger.info('FFmpeg process exited successfully');
-            resolve(true)
-          } else {
-            logger.error('FFmpeg process exited with code:', code);
-            reject(code)
-          }
-        })
-        .noAudio()
-        .size(outputResolution)
-        .save(outputMP4FilePath);
-    })
+      ffmpeg.ffprobe(inputMP4FilePath, (err, metadata) => {
+        if (err) {
+          logger.error('ffprobe error:', err);
+          return reject(err);
+        }
+
+        const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+        if (videoStream && videoStream.codec_name === 'h264') {
+          logger.info('Video is already in h264 format. Copying file.');
+          fs.copyFile(inputMP4FilePath, outputMP4FilePath, (err) => {
+            if (err) {
+              logger.error('Error copying file:', err);
+              return reject(err);
+            }
+            logger.info('File copied successfully');
+            resolve(true);
+          });
+        } else {
+          logger.info('Video is not in h264 format. Converting.');
+          ffmpeg(inputMP4FilePath)
+            .outputOptions([
+              '-c:v libx264',
+              '-strict experimental',
+              '-movflags frag_keyframe+empty_moov+default_base_moof',
+              '-f mp4',
+            ])
+            .videoBitrate(bitrate)
+            .on('end', () => {
+              logger.info('Conversion finished');
+              resolve(true);
+            })
+            .on('error', (err) => {
+              logger.error('FFmpeg error:', err);
+              reject(err);
+            })
+            .noAudio()
+            .size(outputResolution)
+            .save(outputMP4FilePath);
+        }
+      });
+    });
   },
 
   insert: async function (userId, streamId, chunk_id) {
