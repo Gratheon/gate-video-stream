@@ -56,7 +56,6 @@ This project is **dual-licensed**:
 - **[Commercial License](LICENSE-COMMERCIAL.md)** - For enterprise customers who need:
     - 🏢 On-premise deployment without source disclosure
     - 🔧 Custom modifications without copyleft obligations
-    - 🎨 White-label/rebranding rights
     - 📞 Priority support and SLA guarantees
 
 ### Contributing
