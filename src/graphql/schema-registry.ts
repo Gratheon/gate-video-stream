@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
 import config from "../config/index";
+import { logger } from "../logger";
 
 const packageJson = JSON.parse(
   fs.readFileSync(path.resolve("package.json"), "utf8")
@@ -26,13 +27,13 @@ async function postData(url = "", data = {}) {
 
     if (!response.ok) {
       const result = await response.text();
-      console.error(result);
+      logger.error(result);
       return false;
     }
 
     return await response.json(); // parses JSON response into native JavaScript objects
   } catch (e) {
-    console.error(e);
+    logger.error(e);
     return false;
   }
 }

@@ -48,7 +48,7 @@ export default async function upload(
         }
 
         if (data) {
-          logger.info("Upload Success", data.Location);
+          logger.info("Upload Success", { location: data.Location });
 
           resolve(data);
         }

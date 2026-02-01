@@ -10,14 +10,14 @@ import jwt from "jsonwebtoken";
 import gql from "graphql-tag";
 import fs from "fs";
 import path from "path";
-import cors from "fastify-cors"
+import cors from "@fastify/cors"
 
 import { schema } from "./graphql/schema";
 import { resolvers } from "./graphql/resolvers";
 import { initStorage } from "./models/storage";
 import { registerSchema } from "./graphql/schema-registry";
 import config from "./config/index";
-import { logger } from "./logger";
+import { logger, fastifyLogger } from "./logger";
 import './sentry';
 import streamModel from './models/stream'
 // import { loopAnalyzeGateVideo } from './workers/video-inferencer'
@@ -156,7 +156,7 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
   try {
     // @ts-ignore
-    const server = fastify({ logger });
+    const server = fastify({ logger: fastifyLogger });
 
     const version = fs.readFileSync(path.resolve(".version"), "utf8");
     await registerSchema(schema, version);
@@ -175,14 +175,14 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
     logger.info(`📷 Server ready at http://localhost:8950`);
   } catch (e) {
-    console.error(e);
+    logger.error(e);
   }
 })();
 
 
 async function startRestAPI() {
   // @ts-ignore
-  const restServer = fastify({ logger });
+  const restServer = fastify({ logger: fastifyLogger });
 
   restServer.register(cors, {
     origin: '*',

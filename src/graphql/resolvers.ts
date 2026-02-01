@@ -32,7 +32,7 @@ export const resolvers = {
 	},
 	Mutation: {
 		updateVideoSegmentDetectionStats: async (_, { id, detectionStats }, { uid }) => {
-			console.log({ id, detectionStats })
+			logger.debug('updateVideoSegmentDetectionStats', { id, detectionStats })
 			if (!uid) {
 				logger.error('Unauthorized attempt to update video segment detection stats', { id, detectionStats })
 				return null;

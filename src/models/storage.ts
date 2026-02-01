@@ -5,6 +5,7 @@ import * as crypto from "crypto";
 
 import DatabaseSchema, { serializeValue } from "./__generated__";
 import config from "../config/index";
+import { logger } from "../logger";
 
 export { sql };
 
@@ -21,7 +22,7 @@ export function storage() {
   return db;
 }
 
-export async function initStorage(logger) {
+export async function initStorage(storageLogger) {
   const conn = createConnectionPool(
     `mysql://${config.mysql.user}:${config.mysql.password}@${config.mysql.host}:${config.mysql.port}/`
   );
@@ -33,22 +34,22 @@ export async function initStorage(logger) {
   db = createConnectionPool({
     connectionString: `mysql://${config.mysql.user}:${config.mysql.password}@${config.mysql.host}:${config.mysql.port}/${config.mysql.database}`,
     onQueryError: (_query, { text }, err) => {
-      logger.error(
+      storageLogger.error(
         `DB error ${text} - ${err.message}`
       );
     },
   });
 
-  await migrate(logger);
+  await migrate(storageLogger);
 }
 
 process.once("SIGTERM", () => {
   db.dispose().catch((ex) => {
-    console.error(ex);
+    logger.error(ex);
   });
 });
 
-async function migrate(logger) {
+async function migrate(storageLogger) {
   try {
     await db.query(sql`CREATE TABLE IF NOT EXISTS _db_migrations (
 		hash VARCHAR(255),
@@ -65,7 +66,7 @@ async function migrate(logger) {
 
     // Read each .sql file and execute the SQL statements
     for (const file of sqlFiles) {
-      logger.info(`Processing DB migration ${file}`);
+      storageLogger.info(`Processing DB migration ${file}`);
       const sqlStatement = await fs.promises.readFile(
         `./migrations/${file}`,
         "utf8"
@@ -86,18 +87,18 @@ async function migrate(logger) {
       if (rows.length === 0) {
         await db.query(sql.file(`./migrations/${file}`));
 
-        logger.info(`Successfully executed SQL from ${file}.`);
+        storageLogger.info(`Successfully executed SQL from ${file}.`);
 
         // Store the hash in the dedicated table
         await db.query(
           sql`INSERT INTO _db_migrations (hash, filename, executionTime) VALUES (${hash}, ${file}, NOW())`
         );
-        logger.info(`Successfully stored hash in executed_sql_hashes table.`);
+        storageLogger.info(`Successfully stored hash in executed_sql_hashes table.`);
       } else {
-        logger.info(`SQL from ${file} has already been executed. Skipping.`);
+        storageLogger.info(`SQL from ${file} has already been executed. Skipping.`);
       }
     }
   } catch (err) {
-    console.error(err);
+    logger.error(err);
   }
 }
