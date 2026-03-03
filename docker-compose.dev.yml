@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: ./Dockerfile.dev
     command:
-      ./node_modules/.bin/tsc-watch --project ./src/config/tsconfig.json --onSuccess "node ./app/gate-video-stream.js"
+      pnpm run dev
     environment:
       - ENV_ID=dev
       - PORT=8900

@@ -4,7 +4,7 @@ services:
       context: . 
       dockerfile: ./Dockerfile.prod
     command:
-      node /app/app/gate-video-stream.js
+      pnpm start
     environment:
       - ENV_ID=prod
       - PORT=8900

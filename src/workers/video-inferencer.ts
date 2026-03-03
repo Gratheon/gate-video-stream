@@ -60,7 +60,7 @@ async function detectGateBeesOnVideoSegment(segment) {
 	try {
 		const fileContents = fs.readFileSync(segment.localFilePath);
 		const formData = new FormData();
-		formData.append('file', fileContents, { type: 'application/octet-stream', filename: segment.filename });
+			formData.append('file', fileContents, { contentType: 'application/octet-stream', filename: segment.filename });
 
 		const response = await fetch(config.models_gate_tracker_url, {
 			method: 'POST',

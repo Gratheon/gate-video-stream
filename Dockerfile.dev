@@ -1,14 +1,15 @@
-FROM node:20-alpine
+FROM node:25-alpine
 
 # Install FFmpeg v5
 RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
-# COPY . /app/
-# RUN npm install
-# RUN npm run build
+COPY package.json /app/
+COPY pnpm-lock.yaml /app/pnpm-lock.yaml
+RUN npm install -g pnpm@10.29.2
+RUN pnpm install --frozen-lockfile
 
 EXPOSE 8900
 EXPOSE 8950
 
-CMD ["npm", "run", "start"]
+CMD ["pnpm", "run", "dev"]
