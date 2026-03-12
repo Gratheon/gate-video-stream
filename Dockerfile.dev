@@ -1,12 +1,15 @@
 FROM node:25-alpine
 
-# Install FFmpeg v5
-RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
-COPY package.json /app/
-COPY pnpm-lock.yaml /app/pnpm-lock.yaml
-RUN npm install -g pnpm@10.29.2
+ENV NODE_ENV=development
+
+# Runtime dependency for fluent-ffmpeg
+RUN apk add --no-cache ffmpeg \
+  && npm install -g pnpm@10.29.2 \
+  && mkdir -p /app/tmp
+
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 EXPOSE 8900
