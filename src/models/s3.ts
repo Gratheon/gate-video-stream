@@ -14,11 +14,15 @@ export default async function upload(
   AWS.config.update({
     accessKeyId: config.aws.key,
     secretAccessKey: config.aws.secret,
-    region: "eu-central-1",
+    region: config.aws.region || "eu-central-1",
   });
 
   // Create S3 service object
-  let s3 = new AWS.S3({ apiVersion: "2006-03-01" });
+  let s3 = new AWS.S3({
+    apiVersion: "2006-03-01",
+    endpoint: config.aws.target_upload_endpoint || undefined,
+    s3ForcePathStyle: !!config.aws.s3ForcePathStyle,
+  });
 
   // call S3 to retrieve upload file to specified bucket
   let uploadParams: S3.Types.PutObjectRequest;

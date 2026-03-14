@@ -71,7 +71,7 @@
     "overrides": {
       "mysql2": "3.16.2",
       "xml2js": "0.6.2",
-      "busboy": "1.6.0",
+      "busboy": "0.3.1",
       "@fastify/accepts": "4.3.0",
       "@fastify/cors": "8.5.0"
     }

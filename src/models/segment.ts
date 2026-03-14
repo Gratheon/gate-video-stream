@@ -32,7 +32,6 @@ export default {
           '-c:v libx264',
           '-strict experimental',
           '-movflags frag_keyframe+empty_moov+default_base_moof',
-          '-f mp4',
         ])
         .videoBitrate(bitrate)
         .on('end', () => {
@@ -40,9 +39,9 @@ export default {
           resolve(true)
         })
         .on('error', (err) => {
-          logger.error('FFmpeg error:', err);
-          logger.error('FFmpeg stderr:', err.stderr);
-          logger.error('FFmpeg stdout:', err.stdout);
+          logger.error('FFmpeg error', { message: err?.message, stack: err?.stack });
+          logger.error('FFmpeg stderr', { stderr: err?.stderr });
+          logger.error('FFmpeg stdout', { stdout: err?.stdout });
           reject(err)
         })
         .on('exit', (code, signal) => {
@@ -86,7 +85,6 @@ export default {
               '-c:v libx264',
               '-strict experimental',
               '-movflags frag_keyframe+empty_moov+default_base_moof',
-              '-f mp4',
             ])
             .videoBitrate(bitrate)
             .on('end', () => {

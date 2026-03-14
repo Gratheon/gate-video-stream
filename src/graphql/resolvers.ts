@@ -132,31 +132,35 @@ export const resolvers = {
 				// to avoid re-downloading it, so schedule cleanup a bit later
 				deleteLocalMp4FileLater(mp4FileResized)
 
-				// Process and upload the detections file
-				const detectionsFileInternals = await detectionsFile;
-				const { createReadStream: createDetectionsReadStream } = detectionsFileInternals;
-				const detectionsTmpLocalFilePath = `/app/tmp/${uid}_${chunkID}_detections.mp4`;
-				await segmentModel.writeToFileFromStream(createDetectionsReadStream, detectionsTmpLocalFilePath);
+				// Optional for backward compatibility with older clients.
+				if (detectionsFile) {
+					const detectionsFileInternals = await detectionsFile;
+					const { createReadStream: createDetectionsReadStream } = detectionsFileInternals;
+					const detectionsTmpLocalFilePath = `/app/tmp/${uid}_${chunkID}_detections.mp4`;
+					await segmentModel.writeToFileFromStream(createDetectionsReadStream, detectionsTmpLocalFilePath);
 
-				const detectionsMp4FileResized = `${detectionsTmpLocalFilePath}.mp4`;
-				await segmentModel.convertMp4ToMp4(detectionsTmpLocalFilePath, detectionsMp4FileResized);
+					const detectionsMp4FileResized = `${detectionsTmpLocalFilePath}.mp4`;
+					await segmentModel.convertMp4ToMp4(detectionsTmpLocalFilePath, detectionsMp4FileResized);
 
-				const detectionsGeneratedChunkFilename = `${chunkID}_detections.mp4`;
-				logger.info('Uploading detections file to S3', {
-					detectionsMp4FileResized,
-					uid, boxID,
-					streamID, detectionsGeneratedChunkFilename
-				});
-				await upload(
-					fs.createReadStream(detectionsMp4FileResized),
-					segmentModel.getFileUploadRelPath(uid, boxID, streamID, detectionsGeneratedChunkFilename)
-				);
-				logger.info('Uploaded detections file to S3', ctx);
-				deleteLocalMp4FileLater(detectionsMp4FileResized);
-				try {
-					fs.unlinkSync(detectionsTmpLocalFilePath);
-				} catch (err) {
-					logger.errorEnriched('Error deleting original detections mp4 file', err, ctx);
+					const detectionsGeneratedChunkFilename = `${chunkID}_detections.mp4`;
+					logger.info('Uploading detections file to S3', {
+						detectionsMp4FileResized,
+						uid, boxID,
+						streamID, detectionsGeneratedChunkFilename
+					});
+					await upload(
+						fs.createReadStream(detectionsMp4FileResized),
+						segmentModel.getFileUploadRelPath(uid, boxID, streamID, detectionsGeneratedChunkFilename)
+					);
+					logger.info('Uploaded detections file to S3', ctx);
+					deleteLocalMp4FileLater(detectionsMp4FileResized);
+					try {
+						fs.unlinkSync(detectionsTmpLocalFilePath);
+					} catch (err) {
+						logger.errorEnriched('Error deleting original detections mp4 file', err, ctx);
+					}
+				} else {
+					logger.info('No detectionsFile provided; skipping detections upload', ctx);
 				}
 
 

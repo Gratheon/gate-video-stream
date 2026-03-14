@@ -24,13 +24,18 @@ export default {
 
 	// set own aws s3 bucket where to store files
     aws: {
-        "bucket": "gratheon-test", // use own
-        "key": "", // use own
-        "secret": "" // use own
+        "bucket": process.env.AWS_BUCKET || "gratheon-test", // use own
+        "key": process.env.AWS_KEY || "", // use own
+        "secret": process.env.AWS_SECRET || "", // use own
+        "region": process.env.AWS_REGION || "eu-central-1",
+        // set for MinIO/local S3-compatible targets
+        "target_upload_endpoint": process.env.AWS_TARGET_UPLOAD_ENDPOINT || "",
+        "s3ForcePathStyle": process.env.AWS_S3_FORCE_PATH_STYLE === "1"
     },
-    "files_base_url": "https://gratheon-test.s3.eu-central-1.amazonaws.com/",
+    "files_base_url": process.env.FILES_BASE_URL || "https://gratheon-test.s3.eu-central-1.amazonaws.com/",
 
     jwt:{
-        privateKey: "",
+        // should match user-cycle JWT_KEY
+        privateKey: process.env.JWT_KEY || "",
     }
 }

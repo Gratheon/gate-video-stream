@@ -73,17 +73,18 @@ async function startApolloServer(app, typeDefs, resolvers) {
 
       try {
         const bearer = req.request.raw.headers['authorization'];
+        const bearerToken = typeof bearer === 'string' && bearer.startsWith('Bearer ')
+          ? bearer.split(' ')[1]
+          : undefined;
 
         // signature sent by router so that it cannot be faked
         // also allow faking users in dev/test env
-        if (signature === config.routerSignature) {
+        if (signature && config.routerSignature && signature === config.routerSignature) {
           uid = req.request.raw.headers["internal-userid"];
         }
 
         // API tokens are managed by the user - https://app.gratheon.com/account
-        else if (bearer) {
-          const bearerToken = bearer.split(' ')[1]
-
+        else if (bearerToken) {
           // Define the GraphQL endpoint URL
           const endpoint = `${config.userCycleUrl}/graphql`;
 
@@ -118,9 +119,21 @@ async function startApolloServer(app, typeDefs, resolvers) {
         // allow direct access in case of upload, use token from header
         // JWT token is sent by the browser, its a session token
         else {
-          const token = req.request.raw.headers.token;
+          const token = req.request.raw.headers.token as string | undefined;
+          const privateKey = config?.jwt?.privateKey;
+
+          if (!token) {
+            logger.warn('JWT token missing in request headers')
+            return { uid: undefined };
+          }
+
+          if (!privateKey) {
+            logger.warn('JWT private key missing in configuration')
+            return { uid: undefined };
+          }
+
           const decoded = await new Promise((resolve, reject) =>
-            jwt.verify(token, config.jwt.privateKey, function (err, decoded) {
+            jwt.verify(token, privateKey, function (err, decoded) {
               if (err) {
                 reject(err);
               }
@@ -207,4 +220,3 @@ async function startRestAPI() {
   });
   await restServer.listen(8950, "0.0.0.0");
 }
-
