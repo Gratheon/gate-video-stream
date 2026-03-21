@@ -7,10 +7,11 @@ import { logger } from '../logger';
 import upload from '../models/s3';
 import segmentModel from '../models/segment';
 import streamModel from '../models/stream';
+import { wrapGraphqlResolversWithMetrics } from '../metrics';
 
 const MP4_FILE_DELETE_TIMEOUT = 2 * 60 * 1000;
 
-export const resolvers = {
+const baseResolvers = {
 	Query: {
 		hello: 'world',
 		videoStreams: async (_, { active, boxIds }, { uid }) => {
@@ -177,6 +178,8 @@ export const resolvers = {
 	},
 	Upload: GraphQLUpload,
 }
+
+export const resolvers = wrapGraphqlResolversWithMetrics(baseResolvers);
 
 function deleteLocalMp4FileLater(mp4File) {
 	setTimeout(() => {
