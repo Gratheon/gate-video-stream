@@ -8,6 +8,15 @@ services:
     environment:
       - ENV_ID=dev
       - PORT=8900
+      - ROUTER_SIGNATURE=okzfERFAXXbRTQWkGFfjo3EcAXjRijnGnaAMEsTXnmdjAVDkQrfyLzscPwUiymbj
+      - JWT_KEY=okzfERFAXXbRTQWkGFfjo3EcAXjRijnGnaAMEsTXnmdjAVDkQrfyLzscPwUiymbj
+      - AWS_KEY=minio-admin
+      - AWS_SECRET=minio-admin
+      - AWS_BUCKET=gratheon-test
+      - AWS_REGION=eu-central-1
+      - AWS_TARGET_UPLOAD_ENDPOINT=http://minio:19000/
+      - AWS_S3_FORCE_PATH_STYLE=1
+      - FILES_BASE_URL=http://localhost:19000/gratheon-test/
     tty: true
     ports:
       - 8900:8900

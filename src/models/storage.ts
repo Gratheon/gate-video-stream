@@ -6,6 +6,7 @@ import * as crypto from "crypto";
 import DatabaseSchema, { serializeValue } from "./__generated__";
 import config from "../config/index";
 import { logger } from "../logger";
+import { recordDbQuery } from "../metrics";
 
 export { sql };
 
@@ -18,6 +19,75 @@ export { files, files_hive_rel, files_frame_side_rel };
 
 // ${sql.join(cols.map(c => sql.ident(c)), `, `)}
 let db;
+
+function extractQueryText(query: unknown): string {
+  if (typeof query === "string") {
+    return query;
+  }
+
+  if (query && typeof query === "object" && "text" in query) {
+    const text = (query as { text?: unknown }).text;
+    if (typeof text === "string") {
+      return text;
+    }
+  }
+
+  return "unknown";
+}
+
+function normalizeQueryShape(sqlText: string): string {
+  if (!sqlText || sqlText === "unknown") {
+    return "unknown";
+  }
+
+  const normalized = sqlText
+    .toLowerCase()
+    .replace(/'[^']*'/g, "?")
+    .replace(/"[^"]*"/g, "?")
+    .replace(/\b\d+(\.\d+)?\b/g, "?")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized.slice(0, 180) || "unknown";
+}
+
+function getQueryOperation(sqlText: string): string {
+  const match = sqlText.trim().match(/^[a-z]+/i);
+  return match ? match[0].toUpperCase() : "UNKNOWN";
+}
+
+function instrumentDbQueryMetrics(pool: any) {
+  const originalQuery = pool.query.bind(pool);
+
+  pool.query = async (query: unknown, ...args: unknown[]) => {
+    const start = process.hrtime.bigint();
+    const queryText = extractQueryText(query);
+    const operation = getQueryOperation(queryText);
+    const queryShape = normalizeQueryShape(queryText);
+
+    try {
+      const result = await originalQuery(query, ...args);
+      const durationSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
+      recordDbQuery({
+        operation,
+        queryShape,
+        status: "success",
+        durationSeconds,
+      });
+      return result;
+    } catch (error) {
+      const durationSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
+      recordDbQuery({
+        operation,
+        queryShape,
+        status: "error",
+        durationSeconds,
+      });
+      throw error;
+    }
+  };
+}
+
 export function storage() {
   return db;
 }
@@ -39,6 +109,7 @@ export async function initStorage(storageLogger) {
       );
     },
   });
+  instrumentDbQueryMetrics(db);
 
   await migrate(storageLogger);
 }

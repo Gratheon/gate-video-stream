@@ -22,6 +22,9 @@ import './sentry';
 import streamModel from './models/stream'
 // import { loopAnalyzeGateVideo } from './workers/video-inferencer'
 import fetch from 'cross-fetch';
+import { metricsContentType, recordHttpRequest, renderMetrics } from "./metrics";
+
+const requestStartTimes = new WeakMap<object, bigint>();
 
 function fastifyAppClosePlugin(app) {
   return {
@@ -176,6 +179,34 @@ async function startApolloServer(app, typeDefs, resolvers) {
     // @ts-ignore
     const server = fastify({ logger: fastifyLogger });
 
+    server.addHook("onRequest", async (request) => {
+      requestStartTimes.set(request.raw, process.hrtime.bigint());
+    });
+
+    server.addHook("onResponse", async (request, reply) => {
+      const start = requestStartTimes.get(request.raw);
+      if (!start) {
+        return;
+      }
+
+      requestStartTimes.delete(request.raw);
+      const elapsedNanoseconds = Number(process.hrtime.bigint() - start);
+      const durationSeconds = elapsedNanoseconds / 1_000_000_000;
+      const route = request.routerPath || request.raw.url?.split("?")[0] || "unknown";
+
+      recordHttpRequest({
+        method: request.method,
+        route,
+        statusCode: reply.statusCode,
+        durationSeconds,
+      });
+    });
+
+    server.get("/metrics", async (_request, reply) => {
+      reply.type(metricsContentType);
+      return renderMetrics();
+    });
+
     const version = fs.readFileSync(path.resolve(".version"), "utf8");
     await registerSchema(schema, version);
     const relPath = await startApolloServer(server, schema, resolvers);
@@ -201,6 +232,29 @@ async function startApolloServer(app, typeDefs, resolvers) {
 async function startRestAPI() {
   // @ts-ignore
   const restServer = fastify({ logger: fastifyLogger });
+
+  restServer.addHook("onRequest", async (request) => {
+    requestStartTimes.set(request.raw, process.hrtime.bigint());
+  });
+
+  restServer.addHook("onResponse", async (request, reply) => {
+    const start = requestStartTimes.get(request.raw);
+    if (!start) {
+      return;
+    }
+
+    requestStartTimes.delete(request.raw);
+    const elapsedNanoseconds = Number(process.hrtime.bigint() - start);
+    const durationSeconds = elapsedNanoseconds / 1_000_000_000;
+    const route = request.routerPath || request.raw.url?.split("?")[0] || "unknown";
+
+    recordHttpRequest({
+      method: request.method,
+      route,
+      statusCode: reply.statusCode,
+      durationSeconds,
+    });
+  });
 
   restServer.register(cors, {
     origin: '*',
