@@ -1,7 +1,8 @@
-FROM node:25-alpine AS base
+FROM platformatic/node-caged:25-slim AS base
 
-# Runtime dependency for fluent-ffmpeg
-RUN apk add --no-cache ffmpeg
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

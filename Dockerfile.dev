@@ -1,11 +1,12 @@
-FROM node:25-alpine
+FROM platformatic/node-caged:25-slim
 
 WORKDIR /app
 
 ENV NODE_ENV=development
 
-# Runtime dependency for fluent-ffmpeg
-RUN apk add --no-cache ffmpeg \
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/* \
   && npm install -g pnpm@10.29.2 \
   && mkdir -p /app/tmp
 
