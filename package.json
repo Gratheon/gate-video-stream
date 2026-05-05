@@ -10,7 +10,7 @@
     "@databases/mysql-typed": "1.0.0",
     "@fastify/cors": "8.5.0",
     "@fastify/multipart": "9.4.0",
-    "@gratheon/log-lib": "2.2.7",
+    "@gratheon/log-lib": "4.1.2",
     "@sendgrid/mail": "8.1.6",
     "@sentry/node": "10.42.0",
     "@sentry/tracing": "7.26.0",
