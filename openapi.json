@@ -5,7 +5,6 @@
     "version": "1.0.0",
     "description": "REST surface of the gate-video-stream service used by the web app to play back HLS playlists for hive entrance videos. Video upload and stream discovery are currently exposed through GraphQL."
   },
-  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "servers": [
     {
       "url": "https://video.gratheon.com",
