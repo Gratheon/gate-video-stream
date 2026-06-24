@@ -1,0 +1,127 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Gratheon Gate Video Stream API",
+    "version": "1.0.0",
+    "description": "REST surface of the gate-video-stream service used by the web app to play back HLS playlists for hive entrance videos. Video upload and stream discovery are currently exposed through GraphQL."
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "https://video.gratheon.com",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:8950",
+      "description": "Local REST development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Video playback"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "HLSPlaylist": {
+        "type": "string",
+        "contentMediaType": "application/vnd.apple.mpegurl",
+        "description": "M3U8 playlist containing the available 10-second MP4 segments for the requested stream.",
+        "examples": [
+          "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nhttps://files.gratheon.com/1/gate_videos/2/3/1.mp4\n"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Stream not found"
+          }
+        },
+        "required": ["error"]
+      }
+    }
+  },
+  "paths": {
+    "/hls/{uid}/{boxId}/{streamId}/playlist.m3u8": {
+      "get": {
+        "tags": ["Video playback"],
+        "summary": "Generate an HLS playlist for a hive entrance video stream",
+        "description": "Returns a playlist assembled from stream segments stored by gate-video-stream. The playlist URL is normally obtained from the GraphQL `videoStreams` query and consumed by the web app video player.",
+        "operationId": "getHlsPlaylist",
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "description": "Owner user ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 42
+          },
+          {
+            "name": "boxId",
+            "in": "path",
+            "required": true,
+            "description": "Hive box ID associated with the entrance camera.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 7
+          },
+          {
+            "name": "streamId",
+            "in": "path",
+            "required": true,
+            "description": "Video stream/session ID.",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 123
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Generated HLS playlist.",
+            "content": {
+              "application/vnd.apple.mpegurl": {
+                "schema": {
+                  "$ref": "#/components/schemas/HLSPlaylist"
+                },
+                "example": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nhttps://files.gratheon.com/42/gate_videos/7/123/1.mp4\n"
+              }
+            }
+          },
+          "404": {
+            "description": "Stream was not found or has no segments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

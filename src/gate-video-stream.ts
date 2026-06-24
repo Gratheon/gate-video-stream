@@ -23,6 +23,7 @@ import streamModel from './models/stream'
 // import { loopAnalyzeGateVideo } from './workers/video-inferencer'
 import fetch from 'cross-fetch';
 import { metricsContentType, recordHttpRequest, renderMetrics } from "./metrics";
+import openapiSpec from "./openapi";
 
 const requestStartTimes = new WeakMap<object, bigint>();
 
@@ -259,6 +260,13 @@ async function startRestAPI() {
   restServer.register(cors, {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE']
+  });
+
+  // Serve the service-owned OpenAPI document next to the REST endpoints so the
+  // public docs can be regenerated from the same contract used in deployments.
+  restServer.get('/openapi.json', async (_request, reply) => {
+    reply.type('application/json');
+    return openapiSpec;
   });
 
   restServer.route({
