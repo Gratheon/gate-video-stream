@@ -5,23 +5,31 @@ import { ManagedUpload } from "aws-sdk/clients/s3";
 import {logger} from '../logger';
 import config from "../config/index";
 
+type AwsConfig = typeof config.aws & Partial<{
+  region: string;
+  target_upload_endpoint: string;
+  s3ForcePathStyle: boolean;
+}>;
+
 export default async function upload(
   fileStream,
   // sourceLocalFilePath,
   targetS3FilePath
 ): Promise<ManagedUpload.SendData> {
+  const awsConfig = config.aws as AwsConfig;
+
   // Set the region
   AWS.config.update({
-    accessKeyId: config.aws.key,
-    secretAccessKey: config.aws.secret,
-    region: config.aws.region || "eu-central-1",
+    accessKeyId: awsConfig.key,
+    secretAccessKey: awsConfig.secret,
+    region: awsConfig.region || "eu-central-1",
   });
 
   // Create S3 service object
   let s3 = new AWS.S3({
     apiVersion: "2006-03-01",
-    endpoint: config.aws.target_upload_endpoint || undefined,
-    s3ForcePathStyle: !!config.aws.s3ForcePathStyle,
+    endpoint: awsConfig.target_upload_endpoint || undefined,
+    s3ForcePathStyle: !!awsConfig.s3ForcePathStyle,
   });
 
   // call S3 to retrieve upload file to specified bucket
@@ -35,7 +43,7 @@ export default async function upload(
   // });
 
   uploadParams = {
-    Bucket: config.aws.bucket,
+    Bucket: awsConfig.bucket,
     Body: fileStream,
     Key: targetS3FilePath,
   };

@@ -3,8 +3,6 @@ services:
     build:
       context: . 
       dockerfile: ./Dockerfile.prod
-    command:
-      pnpm start
     environment:
       - ENV_ID=prod
       - PORT=8900
