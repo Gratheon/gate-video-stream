@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Gratheon Gate Video Stream API",
+    "title": "Gate Video Stream API",
     "version": "1.0.0",
-    "description": "REST surface of the gate-video-stream service used by the web app to play back HLS playlists for hive entrance videos. Video upload and stream discovery are currently exposed through GraphQL."
+    "description": "Use this REST API to turn hive entrance camera recordings into playable HLS playlists. It serves M3U8 playlist data that points video players to stored stream segments; upload and stream discovery remain available through GraphQL."
   },
   "servers": [
     {
@@ -12,7 +12,7 @@
     },
     {
       "url": "http://localhost:8950",
-      "description": "Local REST development server"
+      "description": "Local development"
     }
   ],
   "tags": [
@@ -46,8 +46,8 @@
     "/hls/{uid}/{boxId}/{streamId}/playlist.m3u8": {
       "get": {
         "tags": ["Video playback"],
-        "summary": "Generate an HLS playlist for a hive entrance video stream",
-        "description": "Returns a playlist assembled from stream segments stored by gate-video-stream. The playlist URL is normally obtained from the GraphQL `videoStreams` query and consumed by the web app video player.",
+        "summary": "Get a playable HLS playlist for a hive entrance video stream",
+        "description": "Returns a playlist assembled from stored stream segments. The playlist URL is normally obtained from the GraphQL `videoStreams` query and consumed by a video player.",
         "operationId": "getHlsPlaylist",
         "parameters": [
           {

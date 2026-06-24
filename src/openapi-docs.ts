@@ -3,7 +3,7 @@ export const swaggerUIDocsHTML = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gratheon Gate Video Stream REST API</title>
+  <title>Gate Video Stream REST API</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui.css" />
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -16,10 +16,10 @@ export const swaggerUIDocsHTML = `<!doctype html>
 </head>
 <body>
   <header class="docs-header">
-    <h1>Gratheon Gate Video Stream REST API</h1>
-    <p>This Swagger UI is hosted by gate-video-stream itself, so the documentation follows the service-owned OpenAPI contract. Import the OpenAPI URL into Postman, Bruno, or Insomnia to generate client collections.</p>
-    <a href="/openapi.json">OpenAPI JSON</a>
-    <a href="https://github.com/Gratheon/gate-video-stream">GitHub</a>
+    <h1>Gate Video Stream REST API</h1>
+    <p>Import the OpenAPI URL into Bruno, Postman, or Insomnia.</p>
+    <a href="/openapi.json" target="_blank" rel="noopener noreferrer">OpenAPI JSON</a>
+    <a href="https://github.com/Gratheon/gate-video-stream" target="_blank" rel="noopener noreferrer">GitHub</a>
   </header>
   <main id="swagger-ui"></main>
   <script src="https://unpkg.com/swagger-ui-dist@5.32.8/swagger-ui-bundle.js"></script>
