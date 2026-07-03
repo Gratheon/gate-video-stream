@@ -261,6 +261,20 @@ async function startRestAPI() {
     methods: ['GET', 'POST', 'PUT', 'DELETE']
   });
 
+  // WHY: live publishers push raw JPEG frames with Content-Type image/jpeg.
+  // Fastify rejects unknown non-JSON content types before the route handler, so
+  // register a raw buffer parser before defining /live/publish routes.
+  const parseJpegFrame = (_request, payload, done) => {
+    const chunks: Buffer[] = [];
+    payload.on('data', (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+    payload.on('end', () => done(null, Buffer.concat(chunks)));
+    payload.on('error', (error) => done(error));
+  };
+  restServer.addContentTypeParser('image/jpeg', parseJpegFrame);
+  restServer.addContentTypeParser('image/jpg', parseJpegFrame);
+
   restServer.addHook('preHandler', async (request) => {
     const routeUrl = request.routeOptions?.url || request.raw.url || '';
     const needsAuth = routeUrl.startsWith('/api/entrance-live/');
@@ -427,12 +441,10 @@ async function startRestAPI() {
       return { error: 'Invalid publish token' };
     }
 
-    const chunks: Buffer[] = [];
-    for await (const chunk of request.raw) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-
-    const frameBuffer = Buffer.concat(chunks);
+    const parsedBody = request.body;
+    const frameBuffer = Buffer.isBuffer(parsedBody)
+      ? parsedBody
+      : Buffer.concat([]);
     if (frameBuffer.length === 0) {
       reply.code(400);
       return { error: 'Frame body is required' };
