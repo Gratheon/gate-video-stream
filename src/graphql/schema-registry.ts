@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
+import sha1 from "sha1";
 import config from "../config/index";
 import { logger } from "../logger";
 
@@ -38,11 +39,23 @@ async function postData(url = "", data = {}) {
   }
 }
 
-export async function registerSchema(schema, version) {
+export async function registerSchema(schema, appVersion) {
+  // WHY: gql-schema-registry treats a service/version pair as immutable in production.
+  // Use a schema-content version so deploying new SDL always publishes a fresh entry,
+  // even when .version was not bumped by the deployment pipeline.
+  const schemaVersion = sha1(schema);
+  const version = process.env.ENV_ID === "dev" ? "latest" : schemaVersion;
+
+  logger.info("Pushing schema to registry", {
+    service: packageJson.name,
+    version,
+    appVersion: String(appVersion || "").trim() || undefined,
+  });
+
   await postData(config.schema_registry_url, {
     name: packageJson.name,
     url: config.selfUrl,
-    version: process.env.ENV_ID === "dev" ? "latest" : version,
+    version,
     type_defs: schema,
   });
 }
