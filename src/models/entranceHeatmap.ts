@@ -1,14 +1,14 @@
 import { sql } from "@databases/mysql";
 import { Readable } from "stream";
+import { deflateSync } from "zlib";
 
 import config from "../config/index";
 import { storage } from "./storage";
 import upload from "./s3";
 import { logger } from "../logger";
 
-const DEFAULT_GRID_WIDTH = 96;
-const DEFAULT_GRID_HEIGHT = 72;
 const MAX_DIMENSION = 4096;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 type TrackPoint = [number, number];
 
@@ -22,6 +22,14 @@ type HeatmapUpload = {
   trackHistory?: Record<string, TrackPoint[]>;
 };
 
+type SparseHeatGrid = {
+  version: 2;
+  mode: 'sparse-pixels';
+  width: number;
+  height: number;
+  points: Record<string, number>;
+};
+
 type HeatmapRow = {
   id: number;
   userId?: string | number;
@@ -33,7 +41,7 @@ type HeatmapRow = {
   height?: number;
   gridWidth?: number;
   gridHeight?: number;
-  heatGrid?: number[][] | string | null;
+  heatGrid?: SparseHeatGrid | number[][] | string | null;
   trajectoryCount?: number;
   pointCount?: number;
   lastSampleAt?: Date | string | null;
@@ -61,38 +69,91 @@ function toSqlDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function createGrid(width = DEFAULT_GRID_WIDTH, height = DEFAULT_GRID_HEIGHT) {
-  return Array.from({ length: height }, () => Array.from({ length: width }, () => 0));
+function createSparseGrid(width: number, height: number): SparseHeatGrid {
+  return {
+    version: 2,
+    mode: 'sparse-pixels',
+    width,
+    height,
+    points: {},
+  };
 }
 
-function parseGrid(raw: unknown, width: number, height: number) {
+function scalePointIndex(index: number, fromWidth: number, fromHeight: number, toWidth: number, toHeight: number) {
+  const x = index % fromWidth;
+  const y = Math.floor(index / fromWidth);
+  const scaledX = Math.max(0, Math.min(toWidth - 1, Math.floor((x / fromWidth) * toWidth)));
+  const scaledY = Math.max(0, Math.min(toHeight - 1, Math.floor((y / fromHeight) * toHeight)));
+  return scaledY * toWidth + scaledX;
+}
+
+function parseSparseGrid(raw: unknown, width: number, height: number): SparseHeatGrid {
   if (!raw) {
-    return createGrid(width, height);
+    return createSparseGrid(width, height);
   }
 
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (!Array.isArray(parsed) || parsed.length !== height) {
-      return createGrid(width, height);
+
+    if (parsed?.mode === 'sparse-pixels' && parsed?.points && typeof parsed.points === 'object') {
+      const sourceWidth = clampDimension(parsed.width, width);
+      const sourceHeight = clampDimension(parsed.height, height);
+      const grid = createSparseGrid(width, height);
+
+      for (const [rawIndex, rawValue] of Object.entries(parsed.points)) {
+        const count = Number(rawValue) || 0;
+        const index = Number(rawIndex);
+        if (!Number.isFinite(index) || count <= 0) {
+          continue;
+        }
+
+        const targetIndex = sourceWidth === width && sourceHeight === height
+          ? index
+          : scalePointIndex(index, sourceWidth, sourceHeight, width, height);
+        grid.points[String(targetIndex)] = (grid.points[String(targetIndex)] || 0) + count;
+      }
+
+      return grid;
     }
 
-    return parsed.map((row) => {
-      if (!Array.isArray(row)) {
-        return Array.from({ length: width }, () => 0);
+    if (Array.isArray(parsed)) {
+      // WHY: first implementation stored a low-resolution array. Preserve existing
+      // rows by projecting each old cell to the center of the new high-resolution image.
+      const sourceHeight = parsed.length;
+      const sourceWidth = Array.isArray(parsed[0]) ? parsed[0].length : 0;
+      const grid = createSparseGrid(width, height);
+      if (!sourceWidth || !sourceHeight) {
+        return grid;
       }
-      return Array.from({ length: width }, (_, index) => Number(row[index]) || 0);
-    });
+
+      for (let y = 0; y < sourceHeight; y += 1) {
+        const row = parsed[y];
+        if (!Array.isArray(row)) {
+          continue;
+        }
+        for (let x = 0; x < sourceWidth; x += 1) {
+          const count = Number(row[x]) || 0;
+          if (count <= 0) {
+            continue;
+          }
+          const targetX = Math.max(0, Math.min(width - 1, Math.floor(((x + 0.5) / sourceWidth) * width)));
+          const targetY = Math.max(0, Math.min(height - 1, Math.floor(((y + 0.5) / sourceHeight) * height)));
+          const targetIndex = targetY * width + targetX;
+          grid.points[String(targetIndex)] = (grid.points[String(targetIndex)] || 0) + count;
+        }
+      }
+      return grid;
+    }
   } catch (error) {
     logger.error('Could not parse existing heatmap grid', error);
-    return createGrid(width, height);
   }
+
+  return createSparseGrid(width, height);
 }
 
-function addTracksToGrid(grid: number[][], payload: HeatmapUpload, width: number, height: number) {
-  const sourceWidth = clampDimension(payload.frameDimensions?.width, width);
-  const sourceHeight = clampDimension(payload.frameDimensions?.height, height);
-  const gridHeight = grid.length;
-  const gridWidth = grid[0]?.length || DEFAULT_GRID_WIDTH;
+function addTracksToSparseGrid(grid: SparseHeatGrid, payload: HeatmapUpload) {
+  const sourceWidth = clampDimension(payload.frameDimensions?.width, grid.width);
+  const sourceHeight = clampDimension(payload.frameDimensions?.height, grid.height);
   let trajectoryCount = 0;
   let pointCount = 0;
 
@@ -107,15 +168,16 @@ function addTracksToGrid(grid: number[][], payload: HeatmapUpload, width: number
         continue;
       }
 
-      const x = Number(point[0]);
-      const y = Number(point[1]);
-      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= sourceWidth || y >= sourceHeight) {
+      const sourceX = Number(point[0]);
+      const sourceY = Number(point[1]);
+      if (!Number.isFinite(sourceX) || !Number.isFinite(sourceY) || sourceX < 0 || sourceY < 0 || sourceX >= sourceWidth || sourceY >= sourceHeight) {
         continue;
       }
 
-      const gridX = Math.max(0, Math.min(gridWidth - 1, Math.floor((x / sourceWidth) * gridWidth)));
-      const gridY = Math.max(0, Math.min(gridHeight - 1, Math.floor((y / sourceHeight) * gridHeight)));
-      grid[gridY][gridX] += 1;
+      const x = Math.max(0, Math.min(grid.width - 1, Math.round((sourceX / sourceWidth) * grid.width)));
+      const y = Math.max(0, Math.min(grid.height - 1, Math.round((sourceY / sourceHeight) * grid.height)));
+      const index = y * grid.width + x;
+      grid.points[String(index)] = (grid.points[String(index)] || 0) + 1;
       pointCount += 1;
     }
   }
@@ -129,54 +191,101 @@ function colorForIntensity(value: number) {
     [0, 0, 0],
     [80, 0, 0],
     [180, 20, 0],
-    [255, 120, 0],
-    [255, 230, 80],
-    [255, 255, 255],
+    [255, 70, 0],
+    [255, 180, 0],
+    [255, 255, 180],
   ];
   const scaled = clamped * (stops.length - 1);
   const index = Math.min(stops.length - 2, Math.floor(scaled));
   const local = scaled - index;
   const from = stops[index];
   const to = stops[index + 1];
-  const rgb = from.map((channel, i) => Math.round(channel + (to[i] - channel) * local));
-  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  return from.map((channel, i) => Math.round(channel + (to[i] - channel) * local));
 }
 
-function renderHeatmapSvg(grid: number[][], width: number, height: number, heatmapDate: string) {
-  const gridHeight = grid.length;
-  const gridWidth = grid[0]?.length || DEFAULT_GRID_WIDTH;
-  const cellWidth = width / gridWidth;
-  const cellHeight = height / gridHeight;
-  const maxCount = grid.flat().reduce((max, value) => Math.max(max, Number(value) || 0), 0);
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+    for (let k = 0; k < 8; k += 1) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
 
-  const cells: string[] = [];
-  for (let y = 0; y < gridHeight; y += 1) {
-    for (let x = 0; x < gridWidth; x += 1) {
-      const value = grid[y][x] || 0;
-      if (value <= 0 || maxCount <= 0) {
-        continue;
-      }
+function crc32(buffer: Buffer) {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buffer.length; i += 1) {
+    crc = CRC_TABLE[(crc ^ buffer[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
 
-      // WHY: log scaling keeps busy and moderately visited landing board areas visible
-      // instead of letting a few dense cells dominate the entire daily heatmap.
-      const intensity = Math.log1p(value) / Math.log1p(maxCount);
-      const opacity = Math.max(0.18, Math.min(0.95, intensity));
-      cells.push(
-        `<rect x="${(x * cellWidth).toFixed(2)}" y="${(y * cellHeight).toFixed(2)}" width="${Math.ceil(cellWidth) + 1}" height="${Math.ceil(cellHeight) + 1}" fill="${colorForIntensity(intensity)}" opacity="${opacity.toFixed(3)}" />`
-      );
+function pngChunk(type: string, data: Buffer) {
+  const typeBuffer = Buffer.from(type, 'ascii');
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), 0);
+  return Buffer.concat([length, typeBuffer, data, crc]);
+}
+
+function renderHeatmapPng(grid: SparseHeatGrid) {
+  const maxCount = Object.values(grid.points).reduce((max, value) => Math.max(max, Number(value) || 0), 0);
+  const rowBytes = 1 + grid.width * 4;
+  const raw = Buffer.alloc(rowBytes * grid.height);
+
+  for (let y = 0; y < grid.height; y += 1) {
+    const rowStart = y * rowBytes;
+    raw[rowStart] = 0; // PNG filter type 0
+    for (let x = 0; x < grid.width; x += 1) {
+      raw[rowStart + 1 + x * 4 + 3] = 255;
     }
   }
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Entrance trajectory heatmap for ${heatmapDate}">
-  <rect width="100%" height="100%" fill="#050505" />
-  ${cells.join('\n  ')}
-</svg>
-`;
+  if (maxCount > 0) {
+    for (const [rawIndex, rawValue] of Object.entries(grid.points)) {
+      const count = Number(rawValue) || 0;
+      const index = Number(rawIndex);
+      if (!Number.isFinite(index) || count <= 0 || index < 0 || index >= grid.width * grid.height) {
+        continue;
+      }
+
+      // WHY: logarithmic scaling preserves faint edge/corner dwell patterns while
+      // keeping very dense traffic lanes readable in the same high-resolution PNG.
+      const intensity = Math.log1p(count) / Math.log1p(maxCount);
+      const [r, g, b] = colorForIntensity(intensity);
+      const x = index % grid.width;
+      const y = Math.floor(index / grid.width);
+      const offset = y * rowBytes + 1 + x * 4;
+      raw[offset] = r;
+      raw[offset + 1] = g;
+      raw[offset + 2] = b;
+      raw[offset + 3] = 255;
+    }
+  }
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(grid.width, 0);
+  ihdr.writeUInt32BE(grid.height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 function getUploadRelPath(userId: string | number, boxId: string | number, heatmapDate: string) {
-  return `${userId}/gate_heatmaps/${boxId}/${heatmapDate}.svg`;
+  return `${userId}/gate_heatmaps/${boxId}/${heatmapDate}.png`;
 }
 
 function getImageUrl(userId: string | number, boxId: string | number, heatmapDate: string) {
@@ -241,20 +350,18 @@ export default {
     const sampleDate = parseUploadDate(payload.timestamp);
     const heatmapDate = toSqlDate(sampleDate);
     const existing = await findByDate(userId, payload.boxId, heatmapDate);
-    const width = clampDimension(payload.frameDimensions?.width, existing?.width || 1280);
-    const height = clampDimension(payload.frameDimensions?.height, existing?.height || 720);
-    const gridWidth = existing?.gridWidth || DEFAULT_GRID_WIDTH;
-    const gridHeight = existing?.gridHeight || DEFAULT_GRID_HEIGHT;
-    const grid = parseGrid(existing?.heatGrid, gridWidth, gridHeight);
-    const added = addTracksToGrid(grid, payload, width, height);
+    const width = clampDimension(existing?.width || payload.frameDimensions?.width, 1280);
+    const height = clampDimension(existing?.height || payload.frameDimensions?.height, 720);
+    const grid = parseSparseGrid(existing?.heatGrid, width, height);
+    const added = addTracksToSparseGrid(grid, payload);
 
     if (added.pointCount === 0) {
       logger.info('Heatmap trajectory upload had no valid points', { userId, boxId: payload.boxId, heatmapDate });
     }
 
-    const svg = renderHeatmapSvg(grid, width, height, heatmapDate);
+    const png = renderHeatmapPng(grid);
     const s3Key = getUploadRelPath(userId, payload.boxId, heatmapDate);
-    await upload(Readable.from([svg]), s3Key);
+    await upload(Readable.from([png]), s3Key);
     const imageUrl = getImageUrl(userId, payload.boxId, heatmapDate);
     const serializedGrid = JSON.stringify(grid);
 
@@ -265,6 +372,8 @@ export default {
           s3_key=${s3Key},
           width=${width},
           height=${height},
+          grid_width=${width},
+          grid_height=${height},
           heat_grid=CAST(${serializedGrid} AS JSON),
           trajectory_count=trajectory_count + ${added.trajectoryCount},
           point_count=point_count + ${added.pointCount},
@@ -296,8 +405,8 @@ export default {
           ${s3Key},
           ${width},
           ${height},
-          ${gridWidth},
-          ${gridHeight},
+          ${width},
+          ${height},
           CAST(${serializedGrid} AS JSON),
           ${added.trajectoryCount},
           ${added.pointCount},
