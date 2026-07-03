@@ -1,7 +1,6 @@
-import fetch from 'node-fetch'; // Assuming you're running this test in a Node.js environment
+import fetch from 'node-fetch';
 import FormData from 'form-data';
 import * as fs from "fs";
-import { describe, expect, it } from '@jest/globals';
 import path from 'path';
 
 describe('GraphQL Video Upload Test', () => {

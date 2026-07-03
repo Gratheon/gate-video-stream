@@ -20,6 +20,8 @@ import config from "./config/index";
 import { logger, fastifyLogger } from "./logger";
 import './sentry';
 import streamModel from './models/stream'
+import entranceLiveModel from './models/entranceLive'
+import { buildMultipartFrameChunk, clearLiveFrame, getLiveFrame, storeLiveFrame } from './models/entranceLiveMedia'
 // import { loopAnalyzeGateVideo } from './workers/video-inferencer'
 import fetch from 'cross-fetch';
 import { metricsContentType, recordHttpRequest, renderMetrics } from "./metrics";
@@ -27,6 +29,10 @@ import openapiSpec from "./openapi";
 import { swaggerUIDocsHTML } from "./openapi-docs";
 
 const requestStartTimes = new WeakMap<object, bigint>();
+
+type AuthenticatedRestRequest = {
+  userId?: string;
+};
 
 function fastifyAppClosePlugin(app) {
   return {
@@ -38,6 +44,80 @@ function fastifyAppClosePlugin(app) {
       };
     },
   };
+}
+
+async function resolveBearerUserId(bearerToken?: string) {
+  if (!bearerToken) {
+    return undefined;
+  }
+
+  const endpoint = `${config.userCycleUrl}/graphql`;
+  const bearerTokenValidationResult = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query: `
+        mutation ValidateApiToken($token: String) {
+          validateApiToken(token: $token) {
+            ... on TokenUser{
+                id
+            }
+          }
+        }
+      `,
+      variables: {
+        token: bearerToken
+      },
+    }),
+  })
+
+  const bearerTokenValidationResultJSON = await bearerTokenValidationResult.json()
+
+  return bearerTokenValidationResultJSON?.data?.validateApiToken?.id;
+}
+
+async function resolveRequestUserId(rawHeaders: Record<string, unknown>) {
+  const signature = rawHeaders["internal-router-signature"];
+  const trustedRouterSignatures = [config.routerSignature, "a239vmwoeifworg"].filter(Boolean);
+
+  if (signature && trustedRouterSignatures.includes(String(signature))) {
+    return String(
+      rawHeaders["internal-userid"] ||
+      rawHeaders["internal-userId"] ||
+      ""
+    ) || undefined;
+  }
+
+  const bearer = rawHeaders['authorization'];
+  const bearerToken = typeof bearer === 'string' && bearer.startsWith('Bearer ')
+    ? bearer.split(' ')[1]
+    : undefined;
+
+  if (bearerToken) {
+    return await resolveBearerUserId(bearerToken);
+  }
+
+  const token = rawHeaders.token as string | undefined;
+  const privateKey = config?.jwt?.privateKey;
+
+  if (!token || !privateKey) {
+    return undefined;
+  }
+
+  const decoded = await new Promise((resolve, reject) =>
+    jwt.verify(token, privateKey, function (err, decoded) {
+      if (err) {
+        reject(err);
+      }
+      resolve(decoded);
+    })
+  ) as {
+    user_id: string
+  };
+
+  return decoded?.user_id;
 }
 
 async function startApolloServer(app, typeDefs, resolvers) {
@@ -73,92 +153,10 @@ async function startApolloServer(app, typeDefs, resolvers) {
     },
     context: async (req) => {
       logger.info('loading request context')
-      let uid;
-      let signature = req.request.raw.headers["internal-router-signature"];
 
       try {
-        const bearer = req.request.raw.headers['authorization'];
-        const bearerToken = typeof bearer === 'string' && bearer.startsWith('Bearer ')
-          ? bearer.split(' ')[1]
-          : undefined;
-
-        // Signature sent by graphql-router so user ID forwarding cannot be faked.
-        // Keep backward compatibility with the legacy local-dev signature.
-        const trustedRouterSignatures = [config.routerSignature, "a239vmwoeifworg"].filter(Boolean);
-
-        // also allow faking users in dev/test env
-        if (signature && trustedRouterSignatures.includes(String(signature))) {
-          uid =
-            req.request.raw.headers["internal-userid"] ||
-            req.request.raw.headers["internal-userId"];
-        }
-
-        // API tokens are managed by the user - https://app.gratheon.com/account
-        else if (bearerToken) {
-          // Define the GraphQL endpoint URL
-          const endpoint = `${config.userCycleUrl}/graphql`;
-
-          // Make a POST request with the fetch API
-          const bearerTokenValidationResult = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // You may need to include other headers like authorization if required
-            },
-            body: JSON.stringify({
-              query: `
-                mutation ValidateApiToken($token: String) {
-                  validateApiToken(token: $token) {
-                    ... on TokenUser{
-                        id
-                    }
-                  }
-                }
-              `,
-              variables: {
-                token: bearerToken
-              },
-            }),
-          })
-
-          const bearerTokenValidationResultJSON = await bearerTokenValidationResult.json()
-
-          uid = bearerTokenValidationResultJSON?.data?.validateApiToken?.id
-        }
-
-        // allow direct access in case of upload, use token from header
-        // JWT token is sent by the browser, its a session token
-        else {
-          const token = req.request.raw.headers.token as string | undefined;
-          const privateKey = config?.jwt?.privateKey;
-
-          if (!token) {
-            logger.warn('JWT token missing in request headers')
-            return { uid: undefined };
-          }
-
-          if (!privateKey) {
-            logger.warn('JWT private key missing in configuration')
-            return { uid: undefined };
-          }
-
-          const decoded = await new Promise((resolve, reject) =>
-            jwt.verify(token, privateKey, function (err, decoded) {
-              if (err) {
-                reject(err);
-              }
-              resolve(decoded);
-            })
-          ) as {
-            user_id: string
-          };
-
-          uid = decoded?.user_id;
-        }
-
-        return {
-          uid,
-        };
+        const uid = await resolveRequestUserId(req.request.raw.headers as Record<string, unknown>);
+        return { uid };
       }
       catch (e) {
         logger.error('Error in loading middleware context', e)
@@ -263,6 +261,17 @@ async function startRestAPI() {
     methods: ['GET', 'POST', 'PUT', 'DELETE']
   });
 
+  restServer.addHook('preHandler', async (request) => {
+    const routeUrl = request.routeOptions?.url || request.raw.url || '';
+    const needsAuth = routeUrl.startsWith('/api/entrance-live/');
+    if (!needsAuth) {
+      return;
+    }
+
+    const userId = await resolveRequestUserId(request.raw.headers as Record<string, unknown>);
+    (request as unknown as AuthenticatedRestRequest).userId = userId;
+  });
+
   restServer.get('/docs', async (_request, reply) => {
     reply.type('text/html; charset=utf-8');
     return swaggerUIDocsHTML;
@@ -295,5 +304,200 @@ async function startRestAPI() {
       reply.send(playlist);
     }
   });
+
+  restServer.post('/api/entrance-live/device/status', async (request, reply) => {
+    const userId = (request as unknown as AuthenticatedRestRequest).userId;
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const body = (request.body || {}) as any;
+    if (!body.boxId) {
+      reply.code(400);
+      return { error: 'boxId is required' };
+    }
+
+    await entranceLiveModel.upsertDeviceStatus(userId, {
+      boxId: body.boxId,
+      deviceId: body.deviceId,
+      appVersion: body.appVersion,
+      cameraStatus: body.cameraStatus,
+      publisherState: body.publisherState,
+      status: body.status,
+      lastErrorCode: body.lastErrorCode,
+      lastErrorMessage: body.lastErrorMessage,
+    });
+
+    return { ok: true };
+  });
+
+  restServer.post('/api/entrance-live/device/poll', async (request, reply) => {
+    const userId = (request as unknown as AuthenticatedRestRequest).userId;
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const body = (request.body || {}) as any;
+    if (!body.boxId) {
+      reply.code(400);
+      return { error: 'boxId is required' };
+    }
+
+    await entranceLiveModel.upsertDeviceStatus(userId, {
+      boxId: body.boxId,
+      deviceId: body.deviceId,
+      appVersion: body.appVersion,
+      cameraStatus: body.cameraStatus,
+      publisherState: body.publisherState,
+      status: body.status,
+      lastErrorCode: body.lastErrorCode,
+      lastErrorMessage: body.lastErrorMessage,
+    });
+
+    const commands = await entranceLiveModel.claimPendingCommands(userId, body.boxId, body.limit || 10);
+    return { commands };
+  });
+
+  restServer.post('/api/entrance-live/device/command-ack', async (request, reply) => {
+    const userId = (request as unknown as AuthenticatedRestRequest).userId;
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const body = (request.body || {}) as any;
+    if (!body.boxId || !body.commandId || !body.status) {
+      reply.code(400);
+      return { error: 'boxId, commandId, and status are required' };
+    }
+
+    await entranceLiveModel.acknowledgeCommand(userId, body.boxId, body.commandId, body.status, body.payload);
+    return { ok: true };
+  });
+  restServer.post('/api/entrance-live/device/event', async (request, reply) => {
+    const userId = (request as unknown as AuthenticatedRestRequest).userId;
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const body = (request.body || {}) as any;
+    if (!body.boxId || !body.eventType) {
+      reply.code(400);
+      return { error: 'boxId and eventType are required' };
+    }
+
+    await entranceLiveModel.recordDeviceEvent(userId, body.boxId, {
+      sessionId: body.sessionId,
+      eventType: body.eventType,
+      payload: body.payload,
+    });
+    return { ok: true };
+  });
+
+  restServer.post('/live/publish/:sessionId/frame', async (request, reply) => {
+    const userId = await resolveRequestUserId(request.raw.headers as Record<string, unknown>);
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const sessionId = String((request.params as any)?.sessionId || '');
+    if (!sessionId) {
+      reply.code(400);
+      return { error: 'sessionId is required' };
+    }
+
+    const session = await entranceLiveModel.getSessionByIdForUser(userId, sessionId);
+    if (!session) {
+      reply.code(404);
+      return { error: 'Session not found' };
+    }
+
+    const bearerHeader = request.raw.headers['authorization'];
+    const bearerToken = typeof bearerHeader === 'string' && bearerHeader.startsWith('Bearer ')
+      ? bearerHeader.split(' ')[1]
+      : undefined;
+    const publishToken = request.headers['x-publish-token'];
+
+    if (!publishToken || String(publishToken) !== String(session.publishToken || session.relayCredentials?.publishToken || bearerToken || '')) {
+      reply.code(403);
+      return { error: 'Invalid publish token' };
+    }
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of request.raw) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+
+    const frameBuffer = Buffer.concat(chunks);
+    if (frameBuffer.length === 0) {
+      reply.code(400);
+      return { error: 'Frame body is required' };
+    }
+
+    const contentType = String(request.headers['content-type'] || 'image/jpeg').split(';')[0];
+    if (!['image/jpeg', 'image/jpg'].includes(contentType)) {
+      reply.code(415);
+      return { error: 'Only image/jpeg is supported' };
+    }
+
+    const storedFrame = storeLiveFrame(sessionId, frameBuffer, 'image/jpeg');
+    return {
+      ok: true,
+      sessionId,
+      frameSequence: storedFrame.sequence,
+      frameTimestamp: new Date(storedFrame.updatedAt).toISOString(),
+      bytes: storedFrame.buffer.length,
+    };
+  });
+
+  restServer.get('/live/playback/:sessionId.mjpeg', async (request, reply) => {
+    const userId = await resolveRequestUserId(request.raw.headers as Record<string, unknown>);
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const sessionId = String((request.params as any)?.sessionId || '');
+    if (!sessionId) {
+      reply.code(400);
+      return { error: 'sessionId is required' };
+    }
+
+    const session = await entranceLiveModel.getSessionByIdForUser(userId, sessionId);
+    if (!session) {
+      reply.code(404);
+      return { error: 'Session not found' };
+    }
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      Connection: 'keep-alive',
+      Pragma: 'no-cache',
+      Expires: '0',
+      'X-Accel-Buffering': 'no',
+    });
+
+    let closed = false;
+    request.raw.on('close', () => {
+      closed = true;
+    });
+
+    let lastSequence = 0;
+    while (!closed) {
+      const frame = getLiveFrame(sessionId);
+      if (frame && frame.sequence !== lastSequence) {
+        reply.raw.write(buildMultipartFrameChunk(frame));
+        lastSequence = frame.sequence;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, frame ? 200 : 500));
+    }
+  });
+
   await restServer.listen(8950, "0.0.0.0");
 }

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Gate Video Stream API",
-    "version": "1.0.0",
-    "description": "Use this REST API to turn hive entrance camera recordings into playable HLS playlists. It serves M3U8 playlist data that points video players to stored stream segments; upload and stream discovery remain available through GraphQL."
+    "version": "1.1.0",
+    "description": "Use this REST API to serve historical hive entrance HLS playlists and to host the Entrance Observer live-streaming control plane. Live viewing stays behind gate-video-stream so web-app never needs Jetson private URLs."
   },
   "servers": [
     {
@@ -18,9 +18,19 @@
   "tags": [
     {
       "name": "Video playback"
+    },
+    {
+      "name": "Entrance live control"
     }
   ],
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API token"
+      }
+    },
     "schemas": {
       "HLSPlaylist": {
         "type": "string",
@@ -39,6 +49,101 @@
           }
         },
         "required": ["error"]
+      },
+      "EntranceLiveDeviceStatus": {
+        "type": "object",
+        "properties": {
+          "boxId": { "type": "string", "example": "42" },
+          "deviceId": { "type": "string", "example": "jetson-orin-nano-1" },
+          "appVersion": { "type": "string", "example": "2026.07.02" },
+          "cameraStatus": { "type": "string", "example": "ok" },
+          "publisherState": { "type": "string", "example": "idle" },
+          "lastErrorCode": { "type": "string", "nullable": true },
+          "lastErrorMessage": { "type": "string", "nullable": true },
+          "status": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Implementation-specific health payload such as camera state, bitrate, fps, or relay diagnostics."
+          }
+        },
+        "required": ["boxId"]
+      },
+      "EntranceLiveCommand": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 17 },
+          "sessionId": { "type": "string", "example": "session_123" },
+          "commandType": {
+            "type": "string",
+            "enum": ["START_STREAM", "STOP_STREAM", "UPDATE_QUALITY", "HEALTH_CHECK"]
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "deliveredAt": { "type": "string", "format": "date-time", "nullable": true },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Cloud-issued session and relay details. The device publishes JPEG frames outbound to gate-video-stream, and browser playback stays behind gate-video-stream MJPEG endpoints."
+          }
+        },
+        "required": ["id", "sessionId", "commandType", "createdAt", "payload"]
+      },
+      "EntranceLivePollResponse": {
+        "type": "object",
+        "properties": {
+          "commands": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EntranceLiveCommand" }
+          }
+        },
+        "required": ["commands"]
+      },
+      "EntranceLiveCommandAck": {
+        "type": "object",
+        "properties": {
+          "boxId": { "type": "string", "example": "42" },
+          "commandId": { "type": "integer", "example": 17 },
+          "status": { "type": "string", "example": "accepted" },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["boxId", "commandId", "status"]
+      },
+      "EntranceLiveDeviceEvent": {
+        "type": "object",
+        "properties": {
+          "boxId": { "type": "string", "example": "42" },
+          "sessionId": { "type": "string", "example": "session_123" },
+          "eventType": {
+            "type": "string",
+            "enum": ["DEVICE_ONLINE", "STREAM_STARTING", "STREAM_ACTIVE", "STREAM_FAILED", "STREAM_STOPPED", "HEALTH_CHECK"]
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Status details such as fps, bitrate, resolution, encoder, and any error information."
+          }
+        },
+        "required": ["boxId", "eventType"]
+      },
+      "EntranceLiveFramePublishResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "sessionId": { "type": "string", "example": "session_123" },
+          "frameSequence": { "type": "integer", "example": 12 },
+          "frameTimestamp": { "type": "string", "format": "date-time" },
+          "bytes": { "type": "integer", "example": 48291 }
+        },
+        "required": ["ok", "sessionId", "frameSequence", "frameTimestamp", "bytes"]
+      },
+      "OkResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true }
+        },
+        "required": ["ok"]
       }
     }
   },
@@ -116,6 +221,131 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/entrance-live/device/status": {
+      "post": {
+        "tags": ["Entrance live control"],
+        "summary": "Upsert Entrance Observer device health for a box",
+        "description": "Jetson calls this outbound endpoint to keep gate-video-stream informed about camera and publisher health without exposing any private LAN URL.",
+        "operationId": "upsertEntranceLiveDeviceStatus",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EntranceLiveDeviceStatus" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device status stored.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OkResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/entrance-live/device/poll": {
+      "post": {
+        "tags": ["Entrance live control"],
+        "summary": "Poll pending live-stream commands for a box",
+        "description": "MVP outbound polling inbox for Entrance Observer. Commands are issued by GraphQL session mutations owned by gate-video-stream.",
+        "operationId": "pollEntranceLiveCommands",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  { "$ref": "#/components/schemas/EntranceLiveDeviceStatus" },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pending commands, if any.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EntranceLivePollResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/entrance-live/device/command-ack": {
+      "post": {
+        "tags": ["Entrance live control"],
+        "summary": "Acknowledge delivery or handling of a live-stream command",
+        "operationId": "acknowledgeEntranceLiveCommand",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EntranceLiveCommandAck" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Command acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OkResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/entrance-live/device/event": {
+      "post": {
+        "tags": ["Entrance live control"],
+        "summary": "Report device-side live session lifecycle events",
+        "description": "Used by Entrance Observer to report DEVICE_ONLINE, STREAM_STARTING, STREAM_ACTIVE, STREAM_FAILED, and STREAM_STOPPED events back to gate-video-stream.",
+        "operationId": "reportEntranceLiveEvent",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EntranceLiveDeviceEvent" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event recorded.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OkResponse" }
               }
             }
           }

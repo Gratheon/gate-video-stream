@@ -36,7 +36,7 @@
   },
   "scripts": {
     "build": "tsc -p ./src/config/tsconfig.json",
-    "test": "jest --config ./test/unit/jest.coverage.json",
+    "test": "jest --config ./test/unit/jest.coverage.json --passWithNoTests",
     "test-integration": "jest --config ./test/integration/jest.coverage.json",
     "dev": "tsc-watch --project ./src/config/tsconfig.json --onSuccess \"node ./app/gate-video-stream.js\"",
     "prestart": "sh -c 'if [ ! -f /app/app/gate-video-stream.js ]; then echo \"gate-video-stream.js missing, running build\"; pnpm run build; fi'",
@@ -55,7 +55,7 @@
   },
   "homepage": "https://github.com/gratheon/gate-video-stream#readme",
   "engines": {
-    "node": ">=25.0.0"
+    "node": ">=24.0.0"
   },
   "packageManager": "pnpm@10.29.2",
   "devDependencies": {

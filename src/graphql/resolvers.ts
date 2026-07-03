@@ -1,15 +1,88 @@
 // @ts-ignore
 import fs from 'fs';
 
+import { GraphQLScalarType, Kind } from 'graphql';
 import { GraphQLUpload } from 'graphql-upload';
 
 import { logger } from '../logger';
 import upload from '../models/s3';
 import segmentModel from '../models/segment';
 import streamModel from '../models/stream';
+import entranceLiveModel from '../models/entranceLive';
 import { wrapGraphqlResolversWithMetrics } from '../metrics';
 
 const MP4_FILE_DELETE_TIMEOUT = 2 * 60 * 1000;
+
+const JSONScalar = new GraphQLScalarType({
+	name: 'JSON',
+	description: 'Arbitrary JSON value',
+	serialize(value) {
+		return value;
+	},
+	parseValue(value) {
+		return value;
+	},
+	parseLiteral(ast) {
+		switch (ast.kind) {
+			case Kind.STRING:
+				return ast.value;
+			case Kind.INT:
+				return Number(ast.value);
+			case Kind.FLOAT:
+				return Number(ast.value);
+			case Kind.BOOLEAN:
+				return ast.value;
+			case Kind.NULL:
+				return null;
+			case Kind.OBJECT:
+				return ast.fields.reduce((acc, field) => {
+					acc[field.name.value] = (JSONScalar.parseLiteral as any)(field.value);
+					return acc;
+				}, {} as Record<string, unknown>);
+			case Kind.LIST:
+				return ast.values.map((value) => (JSONScalar.parseLiteral as any)(value));
+			default:
+				return null;
+		}
+	},
+});
+
+function mapSessionToGraphql(session) {
+	if (!session) {
+		return null;
+	}
+
+	return {
+		id: session.id,
+		boxId: session.boxId,
+		status: session.status,
+		playbackUrl: session.playbackUrl,
+		signalingToken: session.signalingToken,
+		expiresAt: session.expiresAt,
+		qualityProfile: session.qualityProfile,
+		recordingMode: session.recordingMode,
+		relayProtocol: session.relayProtocol,
+		publisherUrl: session.publisherUrl,
+		publishToken: session.publishToken,
+		clipHandoffEnabled: Boolean(session.clipHandoffEnabled),
+		handoffStreamId: session.handoffStreamId,
+		lastKeepaliveAt: session.lastKeepaliveAt,
+		lastErrorCode: session.lastErrorCode,
+		lastErrorMessage: session.lastErrorMessage,
+		relayDetails: session.relayCredentials
+			? {
+				relayProtocol: session.relayCredentials.relayProtocol || session.relayProtocol,
+				placeholder: Boolean(session.relayCredentials.placeholder),
+				publisherUrl: session.relayCredentials.publisherUrl || session.publisherUrl,
+				publishToken: session.relayCredentials.publishToken || session.publishToken,
+				signalingToken: session.relayCredentials.signalingToken || session.signalingToken,
+				playbackUrl: session.relayCredentials.playbackUrl || session.playbackUrl,
+				frameContentType: session.relayCredentials.frameContentType || null,
+				playbackContentType: session.relayCredentials.playbackContentType || null,
+			}
+			: null,
+	};
+}
 
 const baseResolvers = {
 	Query: {
@@ -29,6 +102,15 @@ const baseResolvers = {
 			}
 
 			return await segmentModel.getFirstUnprocessed();
+		},
+		entranceLiveStreamSession: async (_, { boxId }, { uid }) => {
+			if (!uid) {
+				logger.error('Unauthorized attempt to access entranceLiveStreamSession', { uid, boxId })
+				return null;
+			}
+
+			const session = await entranceLiveModel.getSessionForBox(uid, boxId);
+			return mapSessionToGraphql(session);
 		}
 	},
 	Mutation: {
@@ -40,6 +122,35 @@ const baseResolvers = {
 			}
 
 			return await segmentModel.updateDetections(id, detectionStats);
+		},
+		startEntranceLiveStream: async (_, { boxId, qualityProfile, recordingMode }, { uid }) => {
+			if (!uid) {
+				throw new Error('Unauthorized');
+			}
+
+			const session = await entranceLiveModel.startSession({
+				userId: uid,
+				boxId,
+				qualityProfile,
+				recordingMode,
+			});
+
+			return mapSessionToGraphql(session);
+		},
+		stopEntranceLiveStream: async (_, { sessionId }, { uid }) => {
+			if (!uid) {
+				throw new Error('Unauthorized');
+			}
+
+			return await entranceLiveModel.stopSession(uid, sessionId);
+		},
+		keepEntranceLiveStreamAlive: async (_, { sessionId }, { uid }) => {
+			if (!uid) {
+				throw new Error('Unauthorized');
+			}
+
+			const session = await entranceLiveModel.keepAlive(uid, sessionId);
+			return mapSessionToGraphql(session);
 		},
 
 		// todo change schema to return graphql ERR type instead of boolean
@@ -84,7 +195,7 @@ const baseResolvers = {
 				}
 
 				// other integrations may send mp4 directly
-				else { //if (fileInternals.mimetype == 'video/mp4') {
+				else {
 
 					tmpLocalFilePath = `${tmpLocalFilePath}_orig.mp4`
 					await segmentModel.writeToFileFromStream(createReadStream, tmpLocalFilePath)
@@ -103,9 +214,6 @@ const baseResolvers = {
 						logger.errorEnriched('Error deleting original mp4 file', err, ctx);
 					}
 				}
-				// else{
-				// 	throw new Error(`Unsupported file MIME type: ${fileInternals.mimetype}`)
-				// }
 
 				// db
 				if (!streamID) {
@@ -177,6 +285,7 @@ const baseResolvers = {
 		},
 	},
 	Upload: GraphQLUpload,
+	JSON: JSONScalar,
 }
 
 export const resolvers = wrapGraphqlResolversWithMetrics(baseResolvers);

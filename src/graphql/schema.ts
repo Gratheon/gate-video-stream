@@ -3,15 +3,62 @@ scalar Upload
 scalar ID
 scalar DateTime
 scalar URL
+scalar JSON
+
+enum EntranceLiveStreamStatus {
+	REQUESTED
+	DEVICE_OFFLINE
+	STARTING
+	ACTIVE
+	STOPPING
+	STOPPED
+	FAILED
+}
+
+type EntranceLiveRelayDetails {
+	relayProtocol: String!
+	placeholder: Boolean
+	publisherUrl: URL
+	publishToken: String
+	signalingToken: String
+	playbackUrl: URL
+	frameContentType: String
+	playbackContentType: String
+}
+
+type EntranceLiveStreamSession {
+	id: ID!
+	boxId: ID!
+	status: EntranceLiveStreamStatus!
+	playbackUrl: URL
+	signalingToken: String
+	expiresAt: DateTime!
+	qualityProfile: String!
+	recordingMode: String!
+	relayProtocol: String!
+	publisherUrl: URL
+	publishToken: String
+	clipHandoffEnabled: Boolean!
+	handoffStreamId: ID
+	lastKeepaliveAt: DateTime
+	lastDeviceSeenAt: DateTime
+	lastErrorCode: String
+	lastErrorMessage: String
+	relayDetails: EntranceLiveRelayDetails
+}
 
 type Query {
 	videoStreams(boxIds: [ID], active: Boolean): [VideoStream]
 	fetchNextUnprocessedVideoSegment: VideoSegment
+	entranceLiveStreamSession(boxId: ID!): EntranceLiveStreamSession
 }
 
 type Mutation {
 	uploadGateVideo(file: Upload!, detectionsFile: Upload, boxId: ID!, startTime: DateTime): Boolean
 	updateVideoSegmentDetectionStats(id: ID!, detectionStats: DetectionStats!): Boolean
+	startEntranceLiveStream(boxId: ID!, qualityProfile: String, recordingMode: String): EntranceLiveStreamSession!
+	stopEntranceLiveStream(sessionId: ID!): Boolean!
+	keepEntranceLiveStreamAlive(sessionId: ID!): EntranceLiveStreamSession!
 }
 
 input DetectionStats {
