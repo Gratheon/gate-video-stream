@@ -49,6 +49,7 @@ type EntranceLiveStreamSession {
 
 type Query {
 	videoStreams(boxIds: [ID], active: Boolean): [VideoStream]
+	entranceHeatmaps(boxIds: [ID]!, date: String, limit: Int): [EntranceHeatmap]
 	fetchNextUnprocessedVideoSegment: VideoSegment
 	entranceLiveStreamSession(boxId: ID!): EntranceLiveStreamSession
 }
@@ -78,6 +79,19 @@ type VideoStream {
 	active: Boolean
 	startTime: DateTime
 	endTime: DateTime
+}
+
+type EntranceHeatmap {
+	id: ID!
+	boxId: ID!
+	date: String!
+	imageURL: URL
+	width: Int
+	height: Int
+	trajectoryCount: Int
+	pointCount: Int
+	lastSampleAt: DateTime
+	updatedAt: DateTime
 }
 
 type VideoSegment{

@@ -21,6 +21,7 @@ import { logger, fastifyLogger } from "./logger";
 import './sentry';
 import streamModel from './models/stream'
 import entranceLiveModel from './models/entranceLive'
+import entranceHeatmapModel from './models/entranceHeatmap'
 import { buildMultipartFrameChunk, clearLiveFrame, getLiveFrame, storeLiveFrame } from './models/entranceLiveMedia'
 // import { loopAnalyzeGateVideo } from './workers/video-inferencer'
 import fetch from 'cross-fetch';
@@ -289,7 +290,7 @@ async function startRestAPI() {
 
   restServer.addHook('preHandler', async (request) => {
     const routeUrl = request.routeOptions?.url || request.raw.url || '';
-    const needsAuth = routeUrl.startsWith('/api/entrance-live/');
+    const needsAuth = routeUrl.startsWith('/api/entrance-live/') || routeUrl.startsWith('/api/entrance-heatmaps/');
     if (!needsAuth) {
       return;
     }
@@ -421,6 +422,34 @@ async function startRestAPI() {
       payload: body.payload,
     });
     return { ok: true };
+  });
+
+  restServer.post('/api/entrance-heatmaps/trajectories', async (request, reply) => {
+    const userId = (request as unknown as AuthenticatedRestRequest).userId;
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const body = (request.body || {}) as any;
+    if (!body.boxId || !body.trackHistory) {
+      reply.code(400);
+      return { error: 'boxId and trackHistory are required' };
+    }
+
+    try {
+      const heatmap = await entranceHeatmapModel.ingestTrajectories(userId, {
+        boxId: body.boxId,
+        timestamp: body.timestamp,
+        frameDimensions: body.frameDimensions || body.frame_dimensions,
+        trackHistory: body.trackHistory || body.track_history,
+      });
+      return { ok: true, heatmap };
+    } catch (error) {
+      logger.error('Entrance heatmap ingest failed', error);
+      reply.code(400);
+      return { error: error instanceof Error ? error.message : 'Could not ingest trajectories' };
+    }
   });
 
   restServer.post('/live/publish/:sessionId/frame', async (request, reply) => {

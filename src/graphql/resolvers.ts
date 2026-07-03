@@ -9,6 +9,7 @@ import upload from '../models/s3';
 import segmentModel from '../models/segment';
 import streamModel from '../models/stream';
 import entranceLiveModel from '../models/entranceLive';
+import entranceHeatmapModel from '../models/entranceHeatmap';
 import { wrapGraphqlResolversWithMetrics } from '../metrics';
 
 const MP4_FILE_DELETE_TIMEOUT = 2 * 60 * 1000;
@@ -94,6 +95,14 @@ const baseResolvers = {
 			}
 
 			return await streamModel.list(uid, boxIds, active)
+		},
+		entranceHeatmaps: async (_, { boxIds, date, limit }, { uid }) => {
+			if (!uid) {
+				logger.error('Unauthorized attempt to access entranceHeatmaps', { uid })
+				return [];
+			}
+
+			return await entranceHeatmapModel.list(uid, boxIds, date, limit)
 		},
 		fetchNextUnprocessedVideoSegment: async (_, __, { uid }) => {
 			if (!uid) {
