@@ -264,13 +264,13 @@ async function startRestAPI() {
   // WHY: live publishers push raw JPEG frames with Content-Type image/jpeg.
   // Fastify rejects unknown non-JSON content types before the route handler, so
   // register a raw buffer parser before defining /live/publish routes.
-  const parseJpegFrame = (_request, payload, done) => {
+  const parseJpegFrame = (_request: any, payload: NodeJS.ReadableStream, done: (error: Error | null, body?: Buffer) => void) => {
     const chunks: Buffer[] = [];
     payload.on('data', (chunk) => {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     });
     payload.on('end', () => done(null, Buffer.concat(chunks)));
-    payload.on('error', (error) => done(error));
+    payload.on('error', (error: Error) => done(error));
   };
   restServer.addContentTypeParser('image/jpeg', parseJpegFrame);
   restServer.addContentTypeParser('image/jpg', parseJpegFrame);
