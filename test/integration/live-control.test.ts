@@ -77,6 +77,24 @@ async function restRequest<T>(path: string, payload: Record<string, unknown>) {
 
   return body;
 }
+async function publishFrame(path: string, publishToken: string, frameBytes: Uint8Array, contentType = 'application/octet-stream') {
+  const response = await fetch(`${restEndpoint}${path}`, {
+    method: 'POST',
+    headers: {
+      ...restHeaders,
+      'Content-Type': contentType,
+      'X-Publish-Token': publishToken,
+    },
+    body: frameBytes,
+  });
+
+  const body = await response.json() as { ok?: boolean; bytes?: number; error?: string };
+  if (!response.ok) {
+    throw new Error(`Frame publish failed for ${path}: ${JSON.stringify(body)}`);
+  }
+
+  return body;
+}
 
 function buildTestBoxId() {
   return String(1_000_000_000 + Math.floor(Math.random() * 100_000_000));
@@ -315,6 +333,17 @@ describe('Entrance Observer live control integration flow', () => {
     expect(activeSession.entranceLiveStreamSession.status).toBe('ACTIVE');
     expect(activeSession.entranceLiveStreamSession.lastErrorCode).toBeNull();
 
+
+    const fakeJpegFrame = new Uint8Array([0xff, 0xd8, 0x01, 0x02, 0x03, 0xff, 0xd9]);
+    const publishedFrame = await publishFrame(
+      `/live/publish/${sessionId}/frame`,
+      started.startEntranceLiveStream.publishToken,
+      fakeJpegFrame,
+      'application/octet-stream'
+    );
+
+    expect(publishedFrame.ok).toBe(true);
+    expect(publishedFrame.bytes).toBe(fakeJpegFrame.length);
     const stopped = await graphqlRequest<{
       stopEntranceLiveStream: boolean;
     }>(`

@@ -261,10 +261,7 @@ async function startRestAPI() {
     methods: ['GET', 'POST', 'PUT', 'DELETE']
   });
 
-  // WHY: live publishers push raw JPEG frames with Content-Type image/jpeg.
-  // Fastify rejects unknown non-JSON content types before the route handler, so
-  // register a raw buffer parser before defining /live/publish routes.
-  const parseJpegFrame = (_request: any, payload: NodeJS.ReadableStream, done: (error: Error | null, body?: Buffer) => void) => {
+  const parseRawFrameBody = (_request: any, payload: NodeJS.ReadableStream, done: (error: Error | null, body?: Buffer) => void) => {
     const chunks: Buffer[] = [];
     payload.on('data', (chunk) => {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -272,8 +269,23 @@ async function startRestAPI() {
     payload.on('end', () => done(null, Buffer.concat(chunks)));
     payload.on('error', (error: Error) => done(error));
   };
-  restServer.addContentTypeParser('image/jpeg', parseJpegFrame);
-  restServer.addContentTypeParser('image/jpg', parseJpegFrame);
+
+  // WHY: deployed Entrance Observer versions can send raw JPEG frames with
+  // image/jpeg or application/octet-stream. Register both plus a safe fallback
+  // so Fastify does not reject the frame before our auth checks run.
+  restServer.addContentTypeParser('image/jpeg', parseRawFrameBody);
+  restServer.addContentTypeParser('image/jpg', parseRawFrameBody);
+  restServer.addContentTypeParser('application/octet-stream', parseRawFrameBody);
+  restServer.addContentTypeParser('*', parseRawFrameBody);
+
+  function extractJpegFrame(buffer: Buffer) {
+    const start = buffer.indexOf(Buffer.from([0xff, 0xd8]));
+    const end = buffer.indexOf(Buffer.from([0xff, 0xd9]), start > -1 ? start : 0);
+    if (start > -1 && end > start) {
+      return buffer.subarray(start, end + 2);
+    }
+    return buffer;
+  }
 
   restServer.addHook('preHandler', async (request) => {
     const routeUrl = request.routeOptions?.url || request.raw.url || '';
@@ -451,12 +463,13 @@ async function startRestAPI() {
     }
 
     const contentType = String(request.headers['content-type'] || 'image/jpeg').split(';')[0];
-    if (!['image/jpeg', 'image/jpg'].includes(contentType)) {
+    if (!['image/jpeg', 'image/jpg', 'application/octet-stream', 'application/x-www-form-urlencoded'].includes(contentType)) {
       reply.code(415);
-      return { error: 'Only image/jpeg is supported' };
+      return { error: 'Only JPEG frame uploads are supported' };
     }
 
-    const storedFrame = storeLiveFrame(sessionId, frameBuffer, 'image/jpeg');
+    const jpegFrame = extractJpegFrame(frameBuffer);
+    const storedFrame = storeLiveFrame(sessionId, jpegFrame, 'image/jpeg');
     return {
       ok: true,
       sessionId,
