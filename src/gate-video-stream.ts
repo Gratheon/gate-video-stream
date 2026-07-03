@@ -501,6 +501,8 @@ async function startRestAPI() {
     reply.raw.writeHead(200, {
       'Content-Type': 'multipart/x-mixed-replace; boundary=frame',
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'token, authorization, content-type',
       Connection: 'keep-alive',
       Pragma: 'no-cache',
       Expires: '0',
