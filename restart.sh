@@ -18,6 +18,7 @@ source ~/.nvm/nvm.sh
 nvm install 25
 nvm use 25
 npm install -g pnpm@10.29.2
+export CI=true
 pnpm install
 pnpm run build
 
