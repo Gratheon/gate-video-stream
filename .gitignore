@@ -1,4 +1,5 @@
 .idea
+.dccache
 input
 input2
 out
@@ -10,3 +11,4 @@ coverage
 app
 src/config/config.dev.ts
 src/config/config.prod.ts
+.DS_Store
