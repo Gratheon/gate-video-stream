@@ -19,8 +19,3 @@ jobs:
       - name: Verify production deployment
         working-directory: /www/gate-video-stream/
         run: ./scripts/verify-production-deployment.sh
-
-
-      - name: Verify production deployment
-        working-directory: /www/gate-video-stream/
-        run: chmod +x scripts/verify-production-deployment.sh && ./scripts/verify-production-deployment.sh

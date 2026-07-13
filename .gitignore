@@ -10,5 +10,6 @@ tmp
 coverage
 app
 src/config/config.dev.ts
-src/config/config.prod.ts
+config/config.prod.env
+config/config.prod.env.*
 .DS_Store

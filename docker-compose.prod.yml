@@ -3,6 +3,8 @@ services:
     build:
       context: . 
       dockerfile: ./Dockerfile.prod
+    env_file:
+      - ./config/config.prod.env
     environment:
       - ENV_ID=prod
       - PORT=8900

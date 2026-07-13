@@ -4,6 +4,7 @@ node_modules
 app
 test
 tmp
+config/config.prod.env*
 
 Dockerfile.dev
 docker-compose.dev.yml
