@@ -1,25 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /www/gate-video-stream/
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-gate-video-stream}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+cd "$ROOT_DIR"
 
-# Production uses host networking, so any stale container from the old default
-# compose project keeps ports 8900/8950 busy and prevents the new project from
-# starting. Stop both names before rebuilding.
-COMPOSE_PROJECT_NAME=gratheon docker-compose -f docker-compose.prod.yml down
-COMPOSE_PROJECT_NAME=gate-video-stream docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+mkdir -p "$ROOT_DIR/tmp"
 
-# tmp folder for videos
-mkdir -p /www/gate-video-stream/tmp
-rm -rf /www/gate-video-stream/app
-
-# installing dependencies is faster on host than in the image
-source ~/.nvm/nvm.sh
-nvm install 25
-nvm use 25
-npm install -g pnpm@10.29.2
-export CI=true
-pnpm install
-pnpm run build
-
-COMPOSE_PROJECT_NAME=gratheon docker-compose -f docker-compose.prod.yml up -d --build
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" docker-compose -f "$COMPOSE_FILE" down --remove-orphans
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" docker-compose -f "$COMPOSE_FILE" up -d --build

@@ -36,7 +36,7 @@
   },
   "scripts": {
     "build": "tsc -p ./src/config/tsconfig.json",
-    "test": "jest --config ./test/unit/jest.coverage.json --passWithNoTests",
+    "test": "jest --config ./test/unit/jest.coverage.json --passWithNoTests && jest --config ./test/deployment.jest.config.json",
     "test-integration": "jest --config ./test/integration/jest.coverage.json",
     "dev": "tsc-watch --project ./src/config/tsconfig.json --onSuccess \"node ./app/gate-video-stream.js\"",
     "prestart": "sh -c 'if [ ! -f /app/app/gate-video-stream.js ]; then echo \"gate-video-stream.js missing, running build\"; pnpm run build; fi'",
