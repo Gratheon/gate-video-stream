@@ -65,8 +65,25 @@ function normalizeFastifyLog(msg: any, args: any[]): { message: string; meta?: a
     return { message: messageFromArgs ? `${String(msg)} ${messageFromArgs}` : String(msg) };
 }
 
+function shouldSkipFastifyInfoLog(msg: any): boolean {
+    const url = typeof msg?.req?.url === 'string' ? msg.req.url : '';
+    const method = typeof msg?.req?.method === 'string' ? msg.req.method : '';
+    const highVolumeRoutes = [
+        '/api/entrance-live/device/poll',
+        '/api/entrance-live/device/events',
+        '/api/entrance-heatmaps/trajectories',
+    ];
+
+    // WHY: device polling/trajectory uploads are operationally noisy at info
+    // level. Keep warnings/errors, metrics, and explicit application logs intact.
+    return method !== '' && highVolumeRoutes.some((route) => url.startsWith(route));
+}
+
 const wrappedFastifyLogger = {
     info: (msg: any, ...args: any[]) => {
+        if (shouldSkipFastifyInfoLog(msg)) {
+            return;
+        }
         const normalized = normalizeFastifyLog(msg, args);
         logger.info(normalized.message, normalized.meta);
     },

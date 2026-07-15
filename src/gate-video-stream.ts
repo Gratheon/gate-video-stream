@@ -387,6 +387,97 @@ async function startRestAPI() {
     return { commands };
   });
 
+  restServer.get('/api/entrance-live/device/events', async (request, reply) => {
+    const userId = (request as unknown as AuthenticatedRestRequest).userId;
+    if (!userId) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const query = ((request as any).query || {}) as Record<string, string | number | undefined>;
+    const boxId = query.boxId;
+    if (!boxId) {
+      reply.code(400);
+      return { error: 'boxId is required' };
+    }
+
+    const limit = Math.max(1, Math.min(100, Number(query.limit || 10) || 10));
+    const pollIntervalMs = Math.max(1000, Number(process.env.ENTRANCE_LIVE_SSE_POLL_INTERVAL_MS || 2000) || 2000);
+    const keepaliveIntervalMs = Math.max(5000, Number(process.env.ENTRANCE_LIVE_SSE_KEEPALIVE_INTERVAL_MS || 25000) || 25000);
+    const deviceStatus = {
+      boxId,
+      deviceId: query.deviceId ? String(query.deviceId) : undefined,
+      appVersion: query.appVersion ? String(query.appVersion) : undefined,
+      cameraStatus: query.cameraStatus ? String(query.cameraStatus) : undefined,
+      publisherState: query.publisherState ? String(query.publisherState) : undefined,
+      status: {
+        transport: 'sse',
+      },
+    };
+
+    // WHY: Entrance Observer used to poll this service every few seconds, which
+    // created noisy HTTP access logs. This SSE endpoint keeps one outbound HTTPS
+    // connection open and streams claimed commands to the device as events.
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    let isClosed = false;
+    request.raw.on('close', () => {
+      isClosed = true;
+    });
+
+    const writeSseEvent = (event: string, payload: unknown) => {
+      if (isClosed || reply.raw.destroyed) {
+        return;
+      }
+      reply.raw.write(`event: ${event}\n`);
+      reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    const writeKeepalive = () => {
+      if (!isClosed && !reply.raw.destroyed) {
+        reply.raw.write(`: keepalive ${new Date().toISOString()}\n\n`);
+      }
+    };
+
+    const wait = (durationMs: number) => new Promise((resolve) => setTimeout(resolve, durationMs));
+
+    try {
+      await entranceLiveModel.upsertDeviceStatus(userId, deviceStatus);
+      writeSseEvent('ready', { ok: true });
+
+      let lastKeepaliveAt = 0;
+      while (!isClosed && !reply.raw.destroyed) {
+        const commands = await entranceLiveModel.claimPendingCommands(userId, boxId, limit);
+        if (commands.length > 0) {
+          writeSseEvent('commands', { commands });
+        }
+
+        const now = Date.now();
+        if (now - lastKeepaliveAt >= keepaliveIntervalMs) {
+          lastKeepaliveAt = now;
+          await entranceLiveModel.upsertDeviceStatus(userId, deviceStatus);
+          writeKeepalive();
+        }
+
+        await wait(pollIntervalMs);
+      }
+    } catch (error) {
+      logger.error('Entrance live SSE stream failed', error);
+      writeSseEvent('error', { error: error instanceof Error ? error.message : 'SSE stream failed' });
+    } finally {
+      isClosed = true;
+      if (!reply.raw.destroyed) {
+        reply.raw.end();
+      }
+    }
+  });
+
   restServer.post('/api/entrance-live/device/command-ack', async (request, reply) => {
     const userId = (request as unknown as AuthenticatedRestRequest).userId;
     if (!userId) {
