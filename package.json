@@ -55,7 +55,7 @@
   },
   "homepage": "https://github.com/gratheon/gate-video-stream#readme",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=26.0.0"
   },
   "packageManager": "pnpm@10.29.2",
   "devDependencies": {
