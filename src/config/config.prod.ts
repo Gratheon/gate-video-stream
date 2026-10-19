@@ -17,6 +17,8 @@ export default {
         database: process.env.DB_NAME || 'gate_video_stream',
         // managed DigitalOcean Postgres only accepts TLS connections
         ssl: process.env.DB_SSL || 'require',
+        poolSize: process.env.DB_POOL_SIZE,
+        idleTimeoutMilliseconds: process.env.DB_IDLE_TIMEOUT_MS,
     },
     files_base_url: process.env.FILES_BASE_URL || defaults.files_base_url,
     aws: {
