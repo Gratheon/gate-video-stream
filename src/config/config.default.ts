@@ -22,6 +22,9 @@ export default {
         database: process.env.DB_NAME || 'gate_video_stream',
         // disable | prefer | require | no-verify
         ssl: process.env.DB_SSL || 'prefer',
+        // optional pool limits, defaults live in src/models/storage.ts
+        poolSize: process.env.DB_POOL_SIZE,
+        idleTimeoutMilliseconds: process.env.DB_IDLE_TIMEOUT_MS,
     },
 
 	// set own aws s3 bucket where to store files

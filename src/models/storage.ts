@@ -3,8 +3,15 @@ import * as fs from "fs";
 import * as crypto from "crypto";
 
 import config from "../config/index";
+
 import { logger } from "../logger";
 import { recordDbQuery } from "../metrics";
+
+// WHY: config.prod.ts replaces the whole postgres section, so pool limits are read with env and default fallbacks here
+function positiveInt(value: unknown, fallback: number): number {
+  const parsed = Math.floor(Number(value));
+  return parsed >= 1 ? parsed : fallback;
+}
 
 export { sql };
 
@@ -92,6 +99,9 @@ export async function initStorage(storageLogger) {
     // DigitalOcean managed Postgres requires TLS; "prefer" also works with the local dev container without TLS.
     ssl: ssl as any,
     bigIntMode: "number",
+    // The managed Postgres cluster is shared by all services and has ~22 usable slots
+    poolSize: positiveInt(config.postgres.poolSize ?? process.env.DB_POOL_SIZE, 2),
+    idleTimeoutMilliseconds: positiveInt(config.postgres.idleTimeoutMilliseconds ?? process.env.DB_IDLE_TIMEOUT_MS, 10000),
     onQueryError: (_query, { text }, err) => {
       storageLogger.error(
         `DB error ${text} - ${err.message}`
