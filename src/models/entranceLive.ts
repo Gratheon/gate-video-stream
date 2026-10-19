@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { sql } from "@databases/mysql";
+import { sql } from "@databases/pg";
 
 import { storage } from "./storage";
 import { clearLiveFrame } from "./entranceLiveMedia";
@@ -151,7 +151,7 @@ async function isDeviceOnline(userId: string | number, boxId: string | number) {
     FROM entrance_live_devices
     WHERE user_id = ${userId}
       AND box_id = ${boxId}
-      AND last_seen_at >= DATE_SUB(NOW(), INTERVAL ${DEVICE_ONLINE_GRACE_SECONDS} SECOND)
+      AND last_seen_at >= NOW() - make_interval(secs => ${DEVICE_ONLINE_GRACE_SECONDS})
     LIMIT 1
   `);
 
@@ -241,8 +241,8 @@ export default {
         ${relay.signalingToken},
         ${relay.publishToken},
         ${toNullableJson(relay.relayCredentials)},
-        ${clipHandoffEnabled ? 1 : 0},
-        DATE_ADD(NOW(), INTERVAL ${SESSION_TTL_MINUTES} MINUTE),
+        ${clipHandoffEnabled},
+        NOW() + make_interval(mins => ${SESSION_TTL_MINUTES}),
         NOW()
       )
     `);
@@ -274,7 +274,7 @@ export default {
       UPDATE entrance_live_sessions
       SET status = 'STOPPING',
           stopped_at = COALESCE(stopped_at, NOW()),
-          expires_at = LEAST(expires_at, DATE_ADD(NOW(), INTERVAL 30 SECOND))
+          expires_at = LEAST(expires_at, NOW() + INTERVAL '30 seconds')
       WHERE id = ${sessionId}
         AND user_id = ${userId}
     `);
@@ -293,7 +293,7 @@ export default {
     await storage().query(sql`
       UPDATE entrance_live_sessions
       SET last_keepalive_at = NOW(),
-          expires_at = DATE_ADD(NOW(), INTERVAL ${SESSION_TTL_MINUTES} MINUTE)
+          expires_at = NOW() + make_interval(mins => ${SESSION_TTL_MINUTES})
       WHERE id = ${sessionId}
         AND user_id = ${userId}
         AND status IN ('REQUESTED', 'DEVICE_OFFLINE', 'STARTING', 'ACTIVE', 'STOPPING')
@@ -348,15 +348,15 @@ export default {
         NOW(),
         ${toNullableJson(payload)}
       )
-      ON DUPLICATE KEY UPDATE
-        device_id = VALUES(device_id),
-        app_version = VALUES(app_version),
-        camera_status = VALUES(camera_status),
-        publisher_state = VALUES(publisher_state),
-        last_error_code = VALUES(last_error_code),
-        last_error_message = VALUES(last_error_message),
+      ON CONFLICT (user_id, box_id) DO UPDATE SET
+        device_id = EXCLUDED.device_id,
+        app_version = EXCLUDED.app_version,
+        camera_status = EXCLUDED.camera_status,
+        publisher_state = EXCLUDED.publisher_state,
+        last_error_code = EXCLUDED.last_error_code,
+        last_error_message = EXCLUDED.last_error_message,
         last_seen_at = NOW(),
-        status_payload = VALUES(status_payload)
+        status_payload = EXCLUDED.status_payload
     `);
 
     await storage().query(sql`
@@ -389,7 +389,7 @@ export default {
       await storage().query(sql`
         UPDATE entrance_live_commands
         SET delivered_at = COALESCE(delivered_at, NOW())
-        WHERE id IN (${ids})
+        WHERE id = ANY(${ids}::int[])
       `);
     }
 

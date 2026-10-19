@@ -1,4 +1,4 @@
-import { sql } from "@databases/mysql";
+import { sql } from "@databases/pg";
 import { Readable } from "stream";
 import { deflateSync } from "zlib";
 
@@ -295,21 +295,22 @@ function getImageUrl(userId: string | number, boxId: string | number, heatmapDat
 async function findByDate(userId: string | number, boxId: string | number, heatmapDate: string): Promise<HeatmapRow | null> {
   const rows = await storage().query(sql`
     SELECT id,
-      user_id as userId,
-      box_id as boxId,
-      heatmap_date as heatmapDate,
-      image_url as imageUrl,
-      s3_key as s3Key,
+      user_id as "userId",
+      box_id as "boxId",
+      -- WHY: node-pg parses DATE as local midnight, which shifts the day in non-UTC timezones
+      heatmap_date::text as "heatmapDate",
+      image_url as "imageUrl",
+      s3_key as "s3Key",
       width,
       height,
-      grid_width as gridWidth,
-      grid_height as gridHeight,
-      heat_grid as heatGrid,
-      trajectory_count as trajectoryCount,
-      point_count as pointCount,
-      last_sample_at as lastSampleAt,
-      created_at as createdAt,
-      updated_at as updatedAt
+      grid_width as "gridWidth",
+      grid_height as "gridHeight",
+      heat_grid as "heatGrid",
+      trajectory_count as "trajectoryCount",
+      point_count as "pointCount",
+      last_sample_at as "lastSampleAt",
+      created_at as "createdAt",
+      updated_at as "updatedAt"
     FROM entrance_heatmaps
     WHERE user_id=${userId} AND box_id=${boxId} AND heatmap_date=${heatmapDate}
     LIMIT 1
@@ -374,7 +375,7 @@ export default {
           height=${height},
           grid_width=${width},
           grid_height=${height},
-          heat_grid=CAST(${serializedGrid} AS JSON),
+          heat_grid=${serializedGrid}::jsonb,
           trajectory_count=trajectory_count + ${added.trajectoryCount},
           point_count=point_count + ${added.pointCount},
           last_sample_at=${sampleDate},
@@ -407,7 +408,7 @@ export default {
           ${height},
           ${width},
           ${height},
-          CAST(${serializedGrid} AS JSON),
+          ${serializedGrid}::jsonb,
           ${added.trajectoryCount},
           ${added.pointCount},
           ${sampleDate}
@@ -427,33 +428,33 @@ export default {
     const rows = date
       ? await storage().query(sql`
         SELECT id,
-          box_id as boxId,
-          heatmap_date as heatmapDate,
-          image_url as imageUrl,
+          box_id as "boxId",
+          heatmap_date::text as "heatmapDate",
+          image_url as "imageUrl",
           width,
           height,
-          trajectory_count as trajectoryCount,
-          point_count as pointCount,
-          last_sample_at as lastSampleAt,
-          updated_at as updatedAt
+          trajectory_count as "trajectoryCount",
+          point_count as "pointCount",
+          last_sample_at as "lastSampleAt",
+          updated_at as "updatedAt"
         FROM entrance_heatmaps
-        WHERE user_id=${userId} AND box_id IN (${boxIds}) AND heatmap_date=${date}
+        WHERE user_id=${userId} AND box_id = ANY(${boxIds.map(Number)}::int[]) AND heatmap_date=${date}
         ORDER BY heatmap_date DESC, updated_at DESC
         LIMIT ${safeLimit}
       `)
       : await storage().query(sql`
         SELECT id,
-          box_id as boxId,
-          heatmap_date as heatmapDate,
-          image_url as imageUrl,
+          box_id as "boxId",
+          heatmap_date::text as "heatmapDate",
+          image_url as "imageUrl",
           width,
           height,
-          trajectory_count as trajectoryCount,
-          point_count as pointCount,
-          last_sample_at as lastSampleAt,
-          updated_at as updatedAt
+          trajectory_count as "trajectoryCount",
+          point_count as "pointCount",
+          last_sample_at as "lastSampleAt",
+          updated_at as "updatedAt"
         FROM entrance_heatmaps
-        WHERE user_id=${userId} AND box_id IN (${boxIds})
+        WHERE user_id=${userId} AND box_id = ANY(${boxIds.map(Number)}::int[])
         ORDER BY heatmap_date DESC, updated_at DESC
         LIMIT ${safeLimit}
       `);

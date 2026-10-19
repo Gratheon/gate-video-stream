@@ -1,23 +1,13 @@
-import createConnectionPool, { sql } from "@databases/mysql";
-import tables from "@databases/mysql-typed";
+import createConnectionPool, { sql } from "@databases/pg";
 import * as fs from "fs";
 import * as crypto from "crypto";
 
-import DatabaseSchema, { serializeValue } from "./__generated__";
 import config from "../config/index";
 import { logger } from "../logger";
 import { recordDbQuery } from "../metrics";
 
 export { sql };
 
-// You can list whatever tables you actually have here:
-const { files, files_hive_rel, files_frame_side_rel } = tables<DatabaseSchema>({
-  serializeValue,
-});
-
-export { files, files_hive_rel, files_frame_side_rel };
-
-// ${sql.join(cols.map(c => sql.ident(c)), `, `)}
 let db;
 
 function extractQueryText(query: unknown): string {
@@ -93,16 +83,15 @@ export function storage() {
 }
 
 export async function initStorage(storageLogger) {
-  const conn = createConnectionPool(
-    `mysql://${config.mysql.user}:${config.mysql.password}@${config.mysql.host}:${config.mysql.port}/`
-  );
+  const { user, password, host, port, database, ssl } = config.postgres;
 
-  await conn.query(sql`
-  CREATE DATABASE IF NOT EXISTS \`gate-video-stream\` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-`);
-
+  // WHY: unlike MySQL, Postgres has no CREATE DATABASE IF NOT EXISTS, and the prod
+  // database lives on a managed cluster where it is provisioned manually.
   db = createConnectionPool({
-    connectionString: `mysql://${config.mysql.user}:${config.mysql.password}@${config.mysql.host}:${config.mysql.port}/${config.mysql.database}`,
+    connectionString: `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`,
+    // DigitalOcean managed Postgres requires TLS; "prefer" also works with the local dev container without TLS.
+    ssl: ssl as any,
+    bigIntMode: "number",
     onQueryError: (_query, { text }, err) => {
       storageLogger.error(
         `DB error ${text} - ${err.message}`
@@ -115,7 +104,7 @@ export async function initStorage(storageLogger) {
 }
 
 process.once("SIGTERM", () => {
-  db.dispose().catch((ex) => {
+  db?.dispose().catch((ex) => {
     logger.error(ex);
   });
 });
@@ -123,19 +112,18 @@ process.once("SIGTERM", () => {
 async function migrate(storageLogger) {
   try {
     await db.query(sql`CREATE TABLE IF NOT EXISTS _db_migrations (
-		hash VARCHAR(255),
-		filename VARCHAR(255),
-		executionTime DATETIME
-	  );
-`);
+      hash VARCHAR(255),
+      filename VARCHAR(255),
+      execution_time TIMESTAMPTZ
+    );`);
 
-    // List the directory containing the .sql files
     const files = await fs.promises.readdir("./migrations");
 
-    // Filter the array to only include .sql files
-    const sqlFiles = files.filter((file) => file.endsWith(".sql"));
+    // Sorted so that migrations run in a deterministic order (readdir order is not guaranteed)
+    const sqlFiles = files
+      .filter((file) => file.endsWith(".sql"))
+      .sort((a, b) => a.localeCompare(b));
 
-    // Read each .sql file and execute the SQL statements
     for (const file of sqlFiles) {
       storageLogger.info(`Processing DB migration ${file}`);
       const sqlStatement = await fs.promises.readFile(
@@ -143,33 +131,33 @@ async function migrate(storageLogger) {
         "utf8"
       );
 
-      // Hash the SQL statements
       const hash = crypto
         .createHash("sha256")
         .update(sqlStatement)
         .digest("hex");
 
-      // Check if the SQL has already been executed by checking the hashes in the dedicated table
+      // Matched by filename too: editing an applied migration does NOT re-run it, add a new file instead
       const rows = await db.query(
-        sql`SELECT * FROM _db_migrations WHERE hash = ${hash}`
+        sql`SELECT * FROM _db_migrations WHERE filename = ${file} OR hash = ${hash} LIMIT 1`
       );
 
-      // If the hash is not in the table, execute the SQL and store the hash in the table
       if (rows.length === 0) {
-        await db.query(sql.file(`./migrations/${file}`));
+        // Postgres supports transactional DDL, so a failed migration leaves no partial schema behind
+        await db.tx(async (dbi) => {
+          await dbi.query(sql.file(`./migrations/${file}`));
+          await dbi.query(
+            sql`INSERT INTO _db_migrations (hash, filename, execution_time) VALUES (${hash}, ${file}, NOW())`
+          );
+        });
 
         storageLogger.info(`Successfully executed SQL from ${file}.`);
-
-        // Store the hash in the dedicated table
-        await db.query(
-          sql`INSERT INTO _db_migrations (hash, filename, executionTime) VALUES (${hash}, ${file}, NOW())`
-        );
-        storageLogger.info(`Successfully stored hash in executed_sql_hashes table.`);
       } else {
         storageLogger.info(`SQL from ${file} has already been executed. Skipping.`);
       }
     }
   } catch (err) {
     logger.error(err);
+    // Fail fast: starting the service against a half-migrated schema hides the problem
+    throw err;
   }
 }

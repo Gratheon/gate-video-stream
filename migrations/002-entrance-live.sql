@@ -1,61 +1,61 @@
-CREATE TABLE IF NOT EXISTS `entrance_live_devices` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `user_id` int unsigned NOT NULL,
-  `box_id` int unsigned NOT NULL,
-  `device_id` varchar(191) DEFAULT NULL,
-  `app_version` varchar(191) DEFAULT NULL,
-  `camera_status` varchar(64) DEFAULT NULL,
-  `publisher_state` varchar(64) DEFAULT NULL,
-  `last_error_code` varchar(64) DEFAULT NULL,
-  `last_error_message` text,
-  `last_seen_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `status_payload` longtext,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_entrance_live_device_user_box` (`user_id`, `box_id`),
-  KEY `idx_entrance_live_devices_last_seen` (`last_seen_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE TABLE IF NOT EXISTS entrance_live_devices (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  box_id INTEGER NOT NULL,
+  device_id VARCHAR(191) DEFAULT NULL,
+  app_version VARCHAR(191) DEFAULT NULL,
+  camera_status VARCHAR(64) DEFAULT NULL,
+  publisher_state VARCHAR(64) DEFAULT NULL,
+  last_error_code VARCHAR(64) DEFAULT NULL,
+  last_error_message TEXT,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status_payload TEXT,
+  CONSTRAINT uniq_entrance_live_device_user_box UNIQUE (user_id, box_id)
+);
 
-CREATE TABLE IF NOT EXISTS `entrance_live_sessions` (
-  `id` varchar(64) NOT NULL,
-  `user_id` int unsigned NOT NULL,
-  `box_id` int unsigned NOT NULL,
-  `status` varchar(32) NOT NULL,
-  `quality_profile` varchar(64) NOT NULL,
-  `recording_mode` varchar(64) NOT NULL,
-  `relay_protocol` varchar(64) NOT NULL DEFAULT 'stored-clip-handoff',
-  `playback_url` text,
-  `publisher_url` text,
-  `signaling_token` varchar(191) DEFAULT NULL,
-  `publish_token` varchar(191) DEFAULT NULL,
-  `relay_credentials` longtext,
-  `clip_handoff_enabled` tinyint(1) NOT NULL DEFAULT 0,
-  `handoff_stream_id` int unsigned DEFAULT NULL,
-  `requested_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `activated_at` datetime DEFAULT NULL,
-  `stopped_at` datetime DEFAULT NULL,
-  `last_keepalive_at` datetime DEFAULT NULL,
-  `last_device_seen_at` datetime DEFAULT NULL,
-  `expires_at` datetime NOT NULL,
-  `last_error_code` varchar(64) DEFAULT NULL,
-  `last_error_message` text,
-  PRIMARY KEY (`id`),
-  KEY `idx_entrance_live_sessions_user_box` (`user_id`, `box_id`),
-  KEY `idx_entrance_live_sessions_status` (`status`),
-  KEY `idx_entrance_live_sessions_expires` (`expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE INDEX IF NOT EXISTS idx_entrance_live_devices_last_seen ON entrance_live_devices (last_seen_at);
 
-CREATE TABLE IF NOT EXISTS `entrance_live_commands` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `session_id` varchar(64) NOT NULL,
-  `user_id` int unsigned NOT NULL,
-  `box_id` int unsigned NOT NULL,
-  `command_type` varchar(32) NOT NULL,
-  `payload` longtext,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `delivered_at` datetime DEFAULT NULL,
-  `acknowledged_at` datetime DEFAULT NULL,
-  `ack_status` varchar(32) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_entrance_live_commands_poll` (`user_id`, `box_id`, `acknowledged_at`, `created_at`),
-  KEY `idx_entrance_live_commands_session` (`session_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+CREATE TABLE IF NOT EXISTS entrance_live_sessions (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  box_id INTEGER NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  quality_profile VARCHAR(64) NOT NULL,
+  recording_mode VARCHAR(64) NOT NULL,
+  relay_protocol VARCHAR(64) NOT NULL DEFAULT 'stored-clip-handoff',
+  playback_url TEXT,
+  publisher_url TEXT,
+  signaling_token VARCHAR(191) DEFAULT NULL,
+  publish_token VARCHAR(191) DEFAULT NULL,
+  relay_credentials TEXT,
+  clip_handoff_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  handoff_stream_id INTEGER DEFAULT NULL,
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  activated_at TIMESTAMPTZ DEFAULT NULL,
+  stopped_at TIMESTAMPTZ DEFAULT NULL,
+  last_keepalive_at TIMESTAMPTZ DEFAULT NULL,
+  last_device_seen_at TIMESTAMPTZ DEFAULT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  last_error_code VARCHAR(64) DEFAULT NULL,
+  last_error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_entrance_live_sessions_user_box ON entrance_live_sessions (user_id, box_id);
+CREATE INDEX IF NOT EXISTS idx_entrance_live_sessions_status ON entrance_live_sessions (status);
+CREATE INDEX IF NOT EXISTS idx_entrance_live_sessions_expires ON entrance_live_sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS entrance_live_commands (
+  id SERIAL PRIMARY KEY,
+  session_id VARCHAR(64) NOT NULL,
+  user_id INTEGER NOT NULL,
+  box_id INTEGER NOT NULL,
+  command_type VARCHAR(32) NOT NULL,
+  payload TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  delivered_at TIMESTAMPTZ DEFAULT NULL,
+  acknowledged_at TIMESTAMPTZ DEFAULT NULL,
+  ack_status VARCHAR(32) DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_entrance_live_commands_poll ON entrance_live_commands (user_id, box_id, acknowledged_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_entrance_live_commands_session ON entrance_live_commands (session_id);
