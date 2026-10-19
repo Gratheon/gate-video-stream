@@ -9,12 +9,14 @@ export default {
     selfRESTUrl: process.env.SELF_REST_URL || 'https://video.gratheon.com',
     userCycleUrl: process.env.USER_CYCLE_URL || 'http://127.0.0.1:4000',
     models_gate_tracker_url: process.env.MODELS_GATE_TRACKER_URL || 'http://127.0.0.1:9100/',
-    mysql: {
+    postgres: {
         host: process.env.DB_HOST || '127.0.0.1',
-        port: process.env.DB_PORT || '3306',
-        user: process.env.DB_USER || 'gate-video-stream',
+        port: process.env.DB_PORT || '5432',
+        user: process.env.DB_USER || 'gate_video_stream',
         password: process.env.DB_PASSWORD || '',
-        database: process.env.DB_NAME || 'gate-video-stream',
+        database: process.env.DB_NAME || 'gate_video_stream',
+        // managed DigitalOcean Postgres only accepts TLS connections
+        ssl: process.env.DB_SSL || 'require',
     },
     files_base_url: process.env.FILES_BASE_URL || defaults.files_base_url,
     aws: {

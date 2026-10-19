@@ -1,14 +1,6 @@
 import { createLogger } from '@gratheon/log-lib';
-import config from '../config';
 
 const { logger, fastifyLogger } = createLogger({
-    mysql: {
-        host: config.mysql.host,
-        port: parseInt(config.mysql.port, 10),
-        user: config.mysql.user,
-        password: config.mysql.password,
-        database: 'logs'
-    },
     logLevel: (process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error') ||
               (process.env.ENV_ID === 'dev' ? 'debug' : 'info')
 });

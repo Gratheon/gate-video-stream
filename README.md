@@ -6,7 +6,7 @@ In UI videos are uploaded from this component:
 ## Features
 - Converts webm videos to mp4 for HLS playback
 - Uploads short 10s video segments to S3 for long-term storage
-- Stores some results in mysql db
+- Stores some results in a Postgres db
 - Theoretically can post videos to be inferenced, but not in use yet as we don't have GPU hosting enabled. Relying on edge devices for now.
 
 ## Limits
@@ -26,9 +26,9 @@ Max - 40 MB video file size limit.
 flowchart LR
 	web-app --"upload from mobile app /graphql"--> gate-video-stream
 	web-app --"get /hls video playlist"--> gate-video-stream
-	gate-video-stream --"store unprocessed files" --> mysql
+	gate-video-stream --"store unprocessed files" --> postgres
 
-    web-app("<a href='https://github.com/Gratheon/web-app'>web-app</a>\n:8080") --> graphql-router("<a href='https://github.com/Gratheon/graphql-router'>graphql-router</a>") --"list video stream URLs"--> gate-video-stream("<a href='https://github.com/Gratheon/gate-video-stream'>gate-video-stream</a>\n:8900") -- "get data for playback" --> mysql
+    web-app("<a href='https://github.com/Gratheon/web-app'>web-app</a>\n:8080") --> graphql-router("<a href='https://github.com/Gratheon/graphql-router'>graphql-router</a>") --"list video stream URLs"--> gate-video-stream("<a href='https://github.com/Gratheon/gate-video-stream'>gate-video-stream</a>\n:8900") -- "get data for playback" --> postgres
 
 	entrance-observer("<a href='https://github.com/Gratheon/entrance-observer'>entrance-observer</a>") --"upload 10s video chunk"--> gate-video-stream  --"store for re-training with 1 month TTL"--> S3
 ```

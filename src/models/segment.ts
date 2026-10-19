@@ -1,4 +1,4 @@
-import { sql } from "@databases/mysql";
+import { sql } from "@databases/pg";
 import ffmpeg from 'fluent-ffmpeg'
 import fs from 'fs'
 
@@ -107,8 +107,8 @@ export default {
     // @ts-ignore
     return (await storage().query(sql`
     INSERT INTO segments (user_id, stream_id, chunk_id) 
-    VALUES (${userId}, ${streamId}, ${chunk_id});
-    SELECT LAST_INSERT_ID() as id;
+    VALUES (${userId}, ${streamId}, ${chunk_id})
+    RETURNING id
     `))[0].id;
   },
 
@@ -123,11 +123,11 @@ export default {
 
   getFirstUnprocessed: async function () {
     const result = await storage().query(
-      sql`SELECT t1.id, t1.user_id, t1.stream_id, t1.chunk_id, t1.add_time as addTime, t2.box_id
+      sql`SELECT t1.id, t1.user_id, t1.stream_id, t1.chunk_id, t1.add_time as "addTime", t2.box_id
 			FROM segments t1
       INNER JOIN streams t2 ON t2.id=t1.stream_id
 			WHERE process_start_time IS NULL
-			ORDER BY add_time ASC
+			ORDER BY t1.add_time ASC
 			LIMIT 1`
     );
 

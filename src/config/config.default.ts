@@ -14,12 +14,14 @@ export default {
     userCycleUrl: 'http://user-cycle:4000',
 
 	// set own db
-    mysql: {
-        host: process.env.NATIVE ? 'localhost': 'mysql',
-        port: process.env.NATIVE ? '60003' :'3306',
-        user: 'root',
-        password: 'test',
-        database: 'gate-video-stream',
+    postgres: {
+        host: process.env.DB_HOST || (process.env.NATIVE ? 'localhost' : 'postgres'),
+        port: process.env.DB_PORT || '5432',
+        user: process.env.DB_USER || 'test',
+        password: process.env.DB_PASSWORD || 'test',
+        database: process.env.DB_NAME || 'gate_video_stream',
+        // disable | prefer | require | no-verify
+        ssl: process.env.DB_SSL || 'prefer',
     },
 
 	// set own aws s3 bucket where to store files

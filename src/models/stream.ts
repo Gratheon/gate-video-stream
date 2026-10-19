@@ -1,4 +1,4 @@
-import { sql } from "@databases/mysql";
+import { sql } from "@databases/pg";
 
 import { storage } from "./storage";
 import config from "../config/index";
@@ -23,22 +23,28 @@ ${segments}
   },
 
   list: async function (userId, boxIds, active): Promise<[number | null, number]> {
+    // boxIds is optional in the GraphQL schema; Postgres ANY() needs a real array
+    if (!boxIds || boxIds.length === 0) {
+      // @ts-ignore
+      return [];
+    }
+
     let streams;
     if (active) {
       streams = await storage().query(
-        sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime, user_id as userId
+        sql`SELECT id, max_segment as "maxSegment", start_time as "startTime", box_id as "boxId", end_time as "endTime", user_id as "userId"
       FROM streams 
-      WHERE user_id=${userId} AND box_id IN (${boxIds}) AND end_time IS NULL
-      ORDER BY start_time DESC
+      WHERE user_id=${userId} AND box_id = ANY(${boxIds.map(Number)}::int[]) AND end_time IS NULL
+      ORDER BY start_time DESC NULLS LAST
       LIMIT 20`
       );
     }
     else {
       streams = await storage().query(
-        sql`SELECT id, max_segment as maxSegment, start_time as startTime, box_id as boxId, end_time as endTime, user_id as userId
+        sql`SELECT id, max_segment as "maxSegment", start_time as "startTime", box_id as "boxId", end_time as "endTime", user_id as "userId"
       FROM streams 
-      WHERE user_id=${userId} AND box_id IN (${boxIds})
-      ORDER BY start_time DESC
+      WHERE user_id=${userId} AND box_id = ANY(${boxIds.map(Number)}::int[])
+      ORDER BY start_time DESC NULLS LAST
       LIMIT 20`
       );
     }
@@ -54,8 +60,8 @@ ${segments}
     const result = await storage().query(
       sql`SELECT id, max_segment
       FROM streams 
-      WHERE user_id=${userId} AND box_id=${boxId} AND end_time is NULL AND NOW() - last_upload_time < ${maxStreamTTLSec}
-      ORDER BY last_upload_time DESC
+      WHERE user_id=${userId} AND box_id=${boxId} AND end_time is NULL AND last_upload_time > NOW() - make_interval(secs => ${maxStreamTTLSec})
+      ORDER BY last_upload_time DESC NULLS LAST
       LIMIT 1`
     );
 
@@ -94,8 +100,8 @@ ${segments}
     // @ts-ignore
     return (await storage().query(sql`
     INSERT INTO streams (user_id, box_id, max_segment, start_time, last_upload_time) 
-    VALUES (${userId}, ${boxId}, 1, ${startTime ? startTime : sql`NOW()`}, NOW());
-    SELECT LAST_INSERT_ID() as id;
+    VALUES (${userId}, ${boxId}, 1, ${startTime ? startTime : sql`NOW()`}, NOW())
+    RETURNING id
     `))[0].id;
   },
 
