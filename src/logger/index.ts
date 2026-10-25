@@ -1,6 +1,6 @@
 import { createLogger } from '@gratheon/log-lib';
 
-const { logger, fastifyLogger } = createLogger({
+const { logger } = createLogger({
     logLevel: (process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error') ||
               (process.env.ENV_ID === 'dev' ? 'debug' : 'info')
 });

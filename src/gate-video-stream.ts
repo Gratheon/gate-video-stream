@@ -22,7 +22,7 @@ import './sentry';
 import streamModel from './models/stream'
 import entranceLiveModel from './models/entranceLive'
 import entranceHeatmapModel from './models/entranceHeatmap'
-import { buildMultipartFrameChunk, clearLiveFrame, getLiveFrame, storeLiveFrame } from './models/entranceLiveMedia'
+import { buildMultipartFrameChunk, getLiveFrame, storeLiveFrame } from './models/entranceLiveMedia'
 // import { loopAnalyzeGateVideo } from './workers/video-inferencer'
 import fetch from 'cross-fetch';
 import { metricsContentType, recordHttpRequest, renderMetrics } from "./metrics";
