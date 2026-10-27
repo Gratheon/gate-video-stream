@@ -92,6 +92,9 @@ export async function initStorage(storageLogger) {
     // DigitalOcean managed Postgres requires TLS; "prefer" also works with the local dev container without TLS.
     ssl: ssl as any,
     bigIntMode: "number",
+    // WHY: the managed Postgres cluster is shared by several services and has few connection
+    // slots; without this @databases/pg opens up to 10 connections.
+    poolSize: Number(process.env.DB_POOL_SIZE) || 4,
     onQueryError: (_query, { text }, err) => {
       storageLogger.error(
         `DB error ${text} - ${err.message}`
